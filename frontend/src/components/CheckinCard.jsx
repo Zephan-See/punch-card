@@ -1,0 +1,279 @@
+import { useState } from 'react';
+import { api } from '../api';
+
+const formatDateTime = (dateString) => {
+  if (!dateString) return { date: '未知', time: '未知' };
+  const date = new Date(dateString);
+  const dateStr = date.toLocaleDateString('zh-CN');
+  const timeStr = date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+  return { date: dateStr, time: timeStr };
+};
+
+export default function CheckinCard({ checkin, displayName, currentUserId, token, onUpdate, allowComment = true }) {
+  const [comments, setComments] = useState([]);
+  const [showComments, setShowComments] = useState(false);
+  const [loadingComments, setLoadingComments] = useState(false);
+  const [newComment, setNewComment] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  const { date, time } = formatDateTime(checkin.created_at);
+  const isOwn = checkin.user_id == currentUserId;
+
+  const loadComments = async () => {
+    setLoadingComments(true);
+    const data = await api.getComments(checkin.id);
+    setComments(data);
+    setLoadingComments(false);
+  };
+
+  const toggleComments = () => {
+    if (!showComments) loadComments();
+    setShowComments(!showComments);
+  };
+
+  const handleLike = async () => {
+    if (submitting || !token) return;
+    setSubmitting(true);
+
+    // Optimistic update via parent
+    const wasLiked = checkin.is_liked;
+    onUpdate({
+      is_liked: !wasLiked,
+      like_count: wasLiked ? Math.max(0, (checkin.like_count || 1) - 1) : (checkin.like_count || 0) + 1
+    });
+
+    const res = wasLiked
+      ? await api.unlike(token, checkin.id)
+      : await api.like(token, checkin.id);
+
+    if (res.error) {
+      // 失败时回滚
+      onUpdate({
+        is_liked: wasLiked,
+        like_count: checkin.like_count
+      });
+      alert(res.error);
+    }
+    setSubmitting(false);
+  };
+
+  const handleAddComment = async () => {
+    if (!newComment.trim() || !token) return;
+    setSubmitting(true);
+    const res = await api.addComment(token, checkin.id, newComment);
+    if (res.error) {
+      alert(res.error);
+    } else {
+      setNewComment('');
+      await loadComments();
+      // 只更新评论数，不影响点赞
+      onUpdate({ comment_count: (checkin.comment_count || 0) + 1 });
+    }
+    setSubmitting(false);
+  };
+
+  const handleDeleteComment = async (commentId) => {
+    if (!confirm('删除这条补充说明？')) return;
+    const res = await api.deleteComment(token, commentId);
+    if (res.error) {
+      alert(res.error);
+    } else {
+      await loadComments();
+      onUpdate({ comment_count: Math.max(0, (checkin.comment_count || 1) - 1) });
+    }
+  };
+
+  const handleShare = async () => {
+    const shareText = `📅 ${displayName || checkin.name} 的打卡：\n\n"${checkin.content}"\n\n${date} ${time}\n\n— 来自打卡小程序`;
+    const shareUrl = window.location.origin + `/wall/${checkin.user_id}`;
+
+    // 优先用 Web Share API（手机原生分享）
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: '我的打卡',
+          text: shareText,
+          url: shareUrl
+        });
+        return;
+      } catch (e) {
+        if (e.name !== 'AbortError') console.error(e);
+      }
+    }
+
+    // 备用：复制到剪贴板
+    try {
+      await navigator.clipboard.writeText(shareText + '\n' + shareUrl);
+      alert('📋 已复制到剪贴板！\n\n粘贴到微信、微博等社交媒体即可分享 ✨');
+    } catch (e) {
+      alert('分享失败，请手动复制');
+    }
+  };
+
+  return (
+    <div className="bg-white rounded-lg shadow-sm p-4 mb-4">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          {checkin.avatar_url && <img src={checkin.avatar_url} alt="" className="w-8 h-8 rounded-full" />}
+          <div>
+            <p className="font-semibold">{displayName || checkin.name || '打卡达人'}</p>
+            <p className="text-xs text-gray-500">{date} {time}</p>
+          </div>
+        </div>
+      </div>
+      <p className="text-gray-700 mb-3 whitespace-pre-wrap">{checkin.content}</p>
+
+      {/* 媒体内容展示 - 支持新分单元格格式 + 老 JSON 格式 + 老单 URL 格式 */}
+      {(() => {
+        // 优先使用新格式：独立字段
+        let images = [];
+        if (checkin.image_1) images.push(checkin.image_1);
+        if (checkin.image_2) images.push(checkin.image_2);
+        if (checkin.image_3) images.push(checkin.image_3);
+        let audio = checkin.audio_url || '';
+        let video = checkin.video_url || '';
+
+        // 如果新字段都是空的，尝试解析老 media_url
+        if (images.length === 0 && !audio && !video && checkin.media_url) {
+          if (checkin.media_type === 'multi' || checkin.media_url.startsWith('{')) {
+            try {
+              const m = JSON.parse(checkin.media_url);
+              images = m.images || [];
+              audio = m.audio || '';
+              video = m.video || '';
+            } catch (e) {}
+          } else {
+            // 更老的单 URL 格式
+            if (checkin.media_type === 'image') images = [checkin.media_url];
+            else if (checkin.media_type === 'audio') audio = checkin.media_url;
+            else if (checkin.media_type === 'video') video = checkin.media_url;
+          }
+        }
+
+        if (images.length === 0 && !audio && !video) return null;
+
+        return (
+          <div className="mb-3 space-y-2">
+            {/* 图片画廊 */}
+            {images.length > 0 && (
+              <div className={`grid gap-1 ${
+                images.length === 1 ? 'grid-cols-1' :
+                images.length === 2 ? 'grid-cols-2' : 'grid-cols-3'
+              }`}>
+                {images.map((img, idx) => (
+                  <img
+                    key={idx}
+                    src={img}
+                    alt=""
+                    className={`w-full object-cover rounded-lg cursor-pointer hover:opacity-90 ${
+                      images.length === 1 ? 'max-h-96' : 'aspect-square'
+                    }`}
+                    onClick={() => window.open(img, '_blank')}
+                  />
+                ))}
+              </div>
+            )}
+            {/* 视频 */}
+            {video && (
+              <video src={video} controls className="rounded-lg w-full max-h-96 bg-black" />
+            )}
+            {/* 录音 */}
+            {audio && (
+              <audio src={audio} controls className="w-full" />
+            )}
+          </div>
+        );
+      })()}
+
+      <div className="flex items-center justify-between border-t pt-3 mt-3 gap-1">
+        <button
+          onClick={handleLike}
+          disabled={submitting}
+          className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-sm transition ${
+            checkin.is_liked ? 'bg-red-50 text-red-600' : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+          }`}
+        >
+          <span>{checkin.is_liked ? '❤️' : '🤍'}</span>
+          <span className="font-medium">{checkin.like_count || 0}</span>
+        </button>
+
+        {allowComment && (
+          <button
+            onClick={toggleComments}
+            className="flex items-center gap-1 px-3 py-1.5 rounded-full text-sm bg-gray-50 text-gray-600 hover:bg-gray-100 transition"
+          >
+            <span>💬</span>
+            <span className="font-medium">补充 {checkin.comment_count || 0}</span>
+          </button>
+        )}
+
+        <button
+          onClick={handleShare}
+          className="flex items-center gap-1 px-3 py-1.5 rounded-full text-sm bg-indigo-50 text-indigo-600 hover:bg-indigo-100 transition"
+        >
+          <span>🔗</span>
+          <span className="font-medium">分享</span>
+        </button>
+      </div>
+
+
+      {showComments && (
+        <div className="mt-3 pt-3 border-t bg-gray-50 -mx-4 -mb-4 px-4 pb-4 rounded-b-lg">
+          {loadingComments ? (
+            <div className="text-center py-3">
+              <div className="inline-block w-5 h-5 border-2 border-gray-300 border-t-indigo-600 rounded-full animate-spin"></div>
+            </div>
+          ) : (
+            <>
+              {comments.length === 0 ? (
+                <p className="text-xs text-gray-400 text-center py-2">还没有补充说明</p>
+              ) : (
+                comments.map(c => (
+                  <div key={c.id} className="bg-white rounded-lg p-3 mb-2 border-l-4 border-indigo-400">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <p className="text-xs text-gray-500 mb-1">
+                          {c.name} · {formatDateTime(c.created_at).time}
+                        </p>
+                        <p className="text-sm text-gray-700">{c.content}</p>
+                      </div>
+                      {c.user_id == currentUserId && (
+                        <button
+                          onClick={() => handleDeleteComment(c.id)}
+                          className="text-xs text-red-500 hover:text-red-700 ml-2"
+                        >
+                          删除
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))
+              )}
+
+              {isOwn && token && (
+                <div className="mt-3 flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="添加补充说明..."
+                    maxLength="100"
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    value={newComment}
+                    onChange={(e) => setNewComment(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') handleAddComment(); }}
+                  />
+                  <button
+                    onClick={handleAddComment}
+                    disabled={submitting || !newComment.trim()}
+                    className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50"
+                  >
+                    发送
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
