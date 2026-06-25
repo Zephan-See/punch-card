@@ -32,7 +32,13 @@ export default function Login() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-600 to-blue-600 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md">
-        <h1 className="text-3xl font-bold text-center mb-8 text-gray-800 inline-flex items-center justify-center gap-2 w-full"><CalendarDays size={28} /> 打卡小程序</h1>
+        {/* Mascot greeting */}
+        <div className="flex flex-col items-center mb-2">
+          <img src="/stickers/Morning.png" alt="" className="w-32 h-32 object-contain" />
+          <p className="text-base font-medium text-gray-700 mt-1">一日一卡，百日同行</p>
+        </div>
+
+        <h1 className="text-2xl font-bold text-center mb-6 text-gray-800 inline-flex items-center justify-center gap-2 w-full"><CalendarDays size={22} /> 打卡小程序</h1>
 
         {error && (
           <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
