@@ -72,7 +72,7 @@ export default function Wall() {
         {viewingFriend && userInfo && (
           <div className="bg-white rounded-lg shadow-sm p-4 mb-4 text-center">
             {userInfo.avatar_url ? (
-              <img src={userInfo.avatar_url} alt="" className="w-16 h-16 rounded-full mx-auto mb-2" />
+              <img src={userInfo.avatar_url} alt="" loading="lazy" decoding="async" className="w-16 h-16 rounded-full mx-auto mb-2" />
             ) : (
               <div className="w-16 h-16 rounded-full bg-gradient-to-br from-indigo-400 to-purple-400 flex items-center justify-center text-white text-2xl font-bold mx-auto mb-2">
                 {userInfo.name?.[0] || '?'}

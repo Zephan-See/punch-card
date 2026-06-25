@@ -175,7 +175,7 @@ export default function CheckinCard({ checkin, displayName, currentUserId, token
     <div className="bg-white rounded-lg shadow-sm p-4 mb-4">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
-          {checkin.avatar_url && <img src={checkin.avatar_url} alt="" className="w-8 h-8 rounded-full" />}
+          {checkin.avatar_url && <img src={checkin.avatar_url} alt="" loading="lazy" decoding="async" className="w-8 h-8 rounded-full" />}
           <div>
             <p className="font-semibold">{displayName || checkin.name || '打卡达人'}</p>
             <p className="text-xs text-gray-500">{date} {time}</p>
@@ -226,6 +226,8 @@ export default function CheckinCard({ checkin, displayName, currentUserId, token
                     key={idx}
                     src={img}
                     alt=""
+                    loading="lazy"
+                    decoding="async"
                     className={`w-full object-cover rounded-lg cursor-pointer hover:opacity-90 ${
                       images.length === 1 ? 'max-h-96' : 'aspect-square'
                     }`}

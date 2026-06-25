@@ -257,7 +257,7 @@ export default function CheckIn() {
             <div className="grid grid-cols-4 gap-2">
               {images.map((img, idx) => (
                 <div key={idx} className="relative aspect-square">
-                  <img src={img} alt="" className="w-full h-full object-cover rounded-lg" />
+                  <img src={img} alt="" loading="lazy" decoding="async" className="w-full h-full object-cover rounded-lg" />
                   <button
                     type="button"
                     onClick={() => removeImage(idx)}

@@ -7,8 +7,6 @@
 
 import { supabase } from './supabase';
 
-const PROFILE_FIELDS = 'id, name, avatar_url, signature, wall_public';
-
 // Convert base64 data URL → File for Storage upload
 function dataUrlToBlob(dataUrl) {
   const [meta, b64] = dataUrl.split(',');
@@ -39,10 +37,8 @@ async function currentUserId() {
   return data.user?.id || null;
 }
 
-// Map a raw checkin row + profile fields to the legacy shape
+// Map a feed_v row to the legacy shape used by UI components.
 function mapCheckin(row) {
-  const p = row.profiles || {};
-  // Prefer new images[] column; fall back to legacy image_1/2/3
   const imagesArr = Array.isArray(row.images) && row.images.length
     ? row.images
     : [row.image_1, row.image_2, row.image_3].filter(Boolean);
@@ -53,13 +49,12 @@ function mapCheckin(row) {
     created_at: row.created_at,
     checked_date: row.checked_date,
     like_count: row.like_count || 0,
-    comment_count: row.comments?.[0]?.count || 0,
-    is_liked: (row.likes && row.likes.length > 0) || false,
-    name: p.name || '',
-    avatar_url: p.avatar_url || '',
-    signature: p.signature || '',
+    comment_count: row.comment_count || 0,
+    is_liked: !!row.is_liked,
+    name: row.name || '',
+    avatar_url: row.avatar_url || '',
+    signature: row.signature || '',
     images: imagesArr,
-    // Legacy fields kept so existing UI code (CheckinCard, Poster) still works
     image_1: imagesArr[0] || '',
     image_2: imagesArr[1] || '',
     image_3: imagesArr[2] || '',
@@ -68,25 +63,14 @@ function mapCheckin(row) {
   };
 }
 
+// Read checkins from the pre-joined feed_v view. One row per checkin,
+// is_liked + comment_count already computed by Postgres for the caller.
 async function fetchCheckinsBase(filterFn) {
-  const me = await currentUserId();
-  let q = supabase
-    .from('checkins')
-    .select(`
-      *,
-      profiles!checkins_user_id_fkey ( ${PROFILE_FIELDS} ),
-      likes!left ( user_id ),
-      comments ( count )
-    `)
-    .order('created_at', { ascending: false });
+  let q = supabase.from('feed_v').select('*').order('created_at', { ascending: false });
   q = filterFn(q);
   const { data, error } = await q;
   if (error) throw error;
-  // RLS already filters by wall_public; we filter `likes` to current user
-  return (data || []).map(row => {
-    row.likes = (row.likes || []).filter(l => l.user_id === me);
-    return mapCheckin(row);
-  });
+  return (data || []).map(mapCheckin);
 }
 
 export const api = {

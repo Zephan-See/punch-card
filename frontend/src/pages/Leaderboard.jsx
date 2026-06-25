@@ -71,7 +71,7 @@ export default function Leaderboard() {
                       <div className="flex items-center gap-3">
                         <span className="text-3xl">{getMedal(idx)}</span>
                         {usr.avatar_url ? (
-                          <img src={usr.avatar_url} alt="" className="w-12 h-12 rounded-full" />
+                          <img src={usr.avatar_url} alt="" loading="lazy" decoding="async" className="w-12 h-12 rounded-full" />
                         ) : (
                           <div className="w-12 h-12 rounded-full bg-gradient-to-br from-indigo-400 to-purple-400 flex items-center justify-center text-white font-bold text-lg">
                             {usr.name?.[0] || '?'}
@@ -109,7 +109,7 @@ export default function Leaderboard() {
                     <div className="flex items-center gap-3">
                       <span className="text-gray-400 font-semibold w-8 text-center">{idx + 4}</span>
                       {usr.avatar_url ? (
-                        <img src={usr.avatar_url} alt="" className="w-10 h-10 rounded-full" />
+                        <img src={usr.avatar_url} alt="" loading="lazy" decoding="async" className="w-10 h-10 rounded-full" />
                       ) : (
                         <div className="w-10 h-10 rounded-full bg-gradient-to-br from-gray-300 to-gray-400 flex items-center justify-center text-white font-bold">
                           {usr.name?.[0] || '?'}

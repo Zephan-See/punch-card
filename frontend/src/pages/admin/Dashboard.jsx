@@ -205,7 +205,7 @@ export default function AdminDashboard() {
               <div key={u.id} className="p-3 border-b last:border-b-0 hover:bg-gray-50">
                 <div className="flex items-start gap-3">
                   {u.avatar_url ? (
-                    <img src={u.avatar_url} alt="" className="w-10 h-10 rounded-full flex-shrink-0" />
+                    <img src={u.avatar_url} alt="" loading="lazy" decoding="async" className="w-10 h-10 rounded-full flex-shrink-0" />
                   ) : (
                     <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-400 to-purple-400 flex items-center justify-center text-white font-bold flex-shrink-0">
                       {u.name?.[0]}
@@ -244,7 +244,7 @@ export default function AdminDashboard() {
               <div key={c.id} className="p-3 border-b last:border-b-0 hover:bg-gray-50">
                 <div className="flex items-start gap-2 mb-2">
                   {c.avatar_url ? (
-                    <img src={c.avatar_url} alt="" className="w-8 h-8 rounded-full flex-shrink-0" />
+                    <img src={c.avatar_url} alt="" loading="lazy" decoding="async" className="w-8 h-8 rounded-full flex-shrink-0" />
                   ) : (
                     <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-400 to-purple-400 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
                       {c.name?.[0]}
