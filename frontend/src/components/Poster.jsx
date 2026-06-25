@@ -123,16 +123,20 @@ const Poster = forwardRef(function Poster({ checkin }, ref) {
           )}
         </div>
 
-        {/* Bottom: mascot + quote + BIG QR */}
+        {/* Bottom: mascot speaks the quote (chat bubble) + BIG QR */}
         <div className="px-4 pb-4">
-          <div className="flex items-stretch gap-3 bg-gradient-to-r from-indigo-50 via-purple-50 to-pink-50 rounded-2xl p-3 border border-indigo-100/60">
-            <img src={sticker} alt="" style={{ width: 130, height: 130 }} className="object-contain flex-shrink-0 -my-1" />
-            <div className="flex-1 min-w-0 flex flex-col justify-center">
-              <p className="text-xs text-indigo-500 tracking-widest font-medium mb-1">今日金句</p>
-              <p className="text-base text-gray-900 leading-snug font-medium">{text}</p>
-              <p className="text-xs text-gray-400 mt-1">— {source}</p>
+          <div className="flex items-center gap-3 bg-gradient-to-r from-indigo-50 via-purple-50 to-pink-50 rounded-2xl p-3 border border-indigo-100/60">
+            <img src={sticker} alt="" style={{ width: 144, height: 144 }} className="object-contain flex-shrink-0" />
+
+            {/* Chat bubble from mascot */}
+            <div className="relative flex-1 min-w-0 bg-white rounded-2xl px-3 py-2.5 shadow-sm border border-indigo-100/60">
+              <div className="absolute -left-1.5 top-1/2 -translate-y-1/2 w-0 h-0 border-y-[7px] border-y-transparent border-r-[9px] border-r-white" />
+              <p className="text-[10px] text-indigo-500 tracking-widest font-medium mb-0.5">今日金句</p>
+              <p className="text-sm text-gray-900 leading-snug font-medium">{text}</p>
+              <p className="text-[10px] text-gray-400 mt-1">— {source}</p>
             </div>
-            <div className="flex flex-col items-center justify-center bg-white rounded-xl p-2 border border-gray-200 self-center">
+
+            <div className="flex flex-col items-center justify-center bg-white rounded-xl p-2 border border-gray-200 flex-shrink-0">
               <QRCodeSVG value={inviteUrl} size={144} level="M" includeMargin={false} />
               <p className="text-xs text-gray-700 mt-1 leading-tight font-semibold">扫码加入</p>
             </div>
