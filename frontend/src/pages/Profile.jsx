@@ -9,7 +9,7 @@ import AvatarCropper from '../components/AvatarCropper';
 export default function Profile() {
   const [profile, setProfile] = useState(null);
   const [editingProfile, setEditingProfile] = useState(false);
-  const [editForm, setEditForm] = useState({ signature: '', avatar: '' });
+  const [editForm, setEditForm] = useState({ name: '', signature: '', avatar: '' });
   const [wallPublic, setWallPublic] = useState(true);
   const [loading, setLoading] = useState(true);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
@@ -74,7 +74,7 @@ export default function Profile() {
   // even if the user clicks 编辑 before the initial fetch finishes.
   useEffect(() => {
     if (profile) {
-      setEditForm({ signature: profile.signature || '', avatar: profile.avatar_url || '' });
+      setEditForm({ name: profile.name || '', signature: profile.signature || '', avatar: profile.avatar_url || '' });
     }
   }, [profile]);
 
@@ -89,12 +89,19 @@ export default function Profile() {
   };
 
   const handleSaveProfile = async () => {
+    const trimmedName = editForm.name.trim();
+    if (!trimmedName) return alert('用户名不能为空');
+    const nameChanged = trimmedName !== (profile?.name || '');
+    if (nameChanged && !confirm(
+      `确认把用户名改成 "${trimmedName}" 吗？\n\n所有历史打卡、评论、排行榜都会显示新用户名。`
+    )) return;
     try {
-      await api.updateProfile(user.token, { 
+      await api.updateProfile(user.token, {
+        name: trimmedName,
         signature: editForm.signature,
         avatar_url: editForm.avatar
       });
-      setProfile({ ...profile, signature: editForm.signature, avatar_url: editForm.avatar });
+      setProfile({ ...profile, name: trimmedName, signature: editForm.signature, avatar_url: editForm.avatar });
       setEditingProfile(false);
       alert('✅ 个人资料已更新');
     } catch (e) {
@@ -121,6 +128,18 @@ export default function Profile() {
         </div>
         <div className="max-w-md mx-auto p-4 pt-8">
           <div className="bg-white rounded-lg shadow-sm p-6 space-y-4">
+            <div>
+              <label className="block text-sm font-medium mb-2">用户名</label>
+              <input
+                type="text"
+                placeholder="你的用户名"
+                maxLength="20"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                value={editForm.name}
+                onChange={(e) => setEditForm({...editForm, name: e.target.value})}
+              />
+              <p className="text-xs text-gray-500 mt-1">所有历史打卡都会同步显示新用户名</p>
+            </div>
             <div>
               <label className="block text-sm font-medium mb-2">个性签名</label>
               <input
