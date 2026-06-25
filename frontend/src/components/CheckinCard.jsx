@@ -23,7 +23,26 @@ export default function CheckinCard({ checkin, displayName, currentUserId, token
   const [posterUrl, setPosterUrl] = useState(null);
   const [posterLoading, setPosterLoading] = useState(false);
   const [posterMounted, setPosterMounted] = useState(false);
+  const [posterCheckin, setPosterCheckin] = useState(null);
   const posterRef = useRef(null);
+
+  // Fetch a URL and convert to base64 data URL. Falls back to original URL
+  // on failure so the poster never just disappears the image entirely.
+  const toDataUrl = async (url) => {
+    if (!url || url.startsWith('data:')) return url || '';
+    try {
+      const blob = await fetch(url, { mode: 'cors' }).then(r => r.blob());
+      return await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+    } catch (e) {
+      console.warn('preload failed', url, e);
+      return url;
+    }
+  };
 
   const { date, time } = formatDateTime(checkin.created_at);
   const isOwn = checkin.user_id == currentUserId;
@@ -129,44 +148,51 @@ export default function CheckinCard({ checkin, displayName, currentUserId, token
     if (posterLoading) return;
     setPosterLoading(true);
     try {
-      if (!posterMounted) setPosterMounted(true);
+      // Preload every remote image as a base64 data URL FIRST.
+      // The Poster then renders with inline data — no cross-origin fetch
+      // happens during html-to-image, no race condition.
+      const imageList = Array.isArray(checkin.images)
+        ? checkin.images
+        : [checkin.image_1, checkin.image_2, checkin.image_3].filter(Boolean);
 
-      // 1. Wait until React actually committed and posterRef is populated
-      //    AND it contains <img> elements. Polled with RAF — robust against
-      //    React 18 async commit timing.
+      const [avatarData, ...imagesData] = await Promise.all([
+        toDataUrl(checkin.avatar_url),
+        ...imageList.map(toDataUrl)
+      ]);
+
+      const preparedCheckin = {
+        ...checkin,
+        avatar_url: avatarData,
+        images: imagesData.filter(Boolean),
+        image_1: imagesData[0] || '',
+        image_2: imagesData[1] || '',
+        image_3: imagesData[2] || ''
+      };
+      setPosterCheckin(preparedCheckin);
+      setPosterMounted(true);
+
+      // Wait for ref to actually contain the new poster after React commits
       const start = Date.now();
       while (Date.now() - start < 5000) {
-        if (
-          posterRef.current &&
-          posterRef.current.querySelectorAll('img').length > 0
-        ) break;
+        if (posterRef.current && posterRef.current.querySelectorAll('img').length > 0) break;
         await new Promise(r => requestAnimationFrame(r));
       }
       if (!posterRef.current) throw new Error('海报组件未就绪');
 
-      // 2. Wait for every <img> to actually finish loading. Check complete
-      //    AFTER attaching listeners to avoid the "loaded between check and
-      //    listen" race. Safety timeout per image so one slow fetch can't
-      //    hang forever.
+      // Even with data URLs the browser still decodes async — wait for that
       const imgs = Array.from(posterRef.current.querySelectorAll('img'));
       await Promise.all(imgs.map(img => new Promise(resolve => {
         const done = () => resolve();
         img.addEventListener('load', done, { once: true });
         img.addEventListener('error', done, { once: true });
-        // Already loaded? resolve immediately
         if (img.complete && img.naturalWidth > 0) done();
-        // Hard cap so a stuck image can't block forever
-        setTimeout(done, 8000);
+        setTimeout(done, 5000);
       })));
 
-      // 3. One more paint cycle so any layout reflow finishes
       await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
 
       const { toPng } = await import('html-to-image');
-      const dataUrl = await toPng(posterRef.current, {
-        pixelRatio: 2,
-        fetchRequestInit: { mode: 'cors' }
-      });
+      const dataUrl = await toPng(posterRef.current, { pixelRatio: 2 });
       setPosterUrl(dataUrl);
     } catch (e) {
       alert('生成海报失败：' + e.message);
@@ -329,11 +355,11 @@ export default function CheckinCard({ checkin, displayName, currentUserId, token
         )}
       </div>
 
-      {/* Off-screen poster — only mounted (and lazy-loaded) for own checkins */}
-      {isOwn && posterMounted && (
+      {/* Off-screen poster — uses preloaded data-URL images to avoid CORS race */}
+      {isOwn && posterMounted && posterCheckin && (
         <div style={{ position: 'fixed', left: '-9999px', top: 0, pointerEvents: 'none' }} aria-hidden="true">
           <Suspense fallback={null}>
-            <Poster ref={posterRef} checkin={checkin} />
+            <Poster ref={posterRef} checkin={posterCheckin} />
           </Suspense>
         </div>
       )}
