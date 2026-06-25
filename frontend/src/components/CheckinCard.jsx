@@ -30,9 +30,15 @@ export default function CheckinCard({ checkin, displayName, currentUserId, token
 
   const loadComments = async () => {
     setLoadingComments(true);
-    const data = await api.getComments(checkin.id);
-    setComments(data);
-    setLoadingComments(false);
+    try {
+      const data = await api.getComments(checkin.id);
+      setComments(data || []);
+    } catch (e) {
+      console.error('loadComments error:', e);
+      setComments([]);
+    } finally {
+      setLoadingComments(false);
+    }
   };
 
   const toggleComments = () => {

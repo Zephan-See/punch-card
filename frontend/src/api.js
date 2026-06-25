@@ -204,15 +204,30 @@ export const api = {
   },
 
   getComments: async (checkinId) => {
-    const { data, error } = await supabase
+    // comments.user_id references auth.users, not profiles, so PostgREST
+    // can't auto-join. Do two queries and merge in JS.
+    const { data: comments, error } = await supabase
       .from('comments')
-      .select('id, user_id, content, created_at, profiles!comments_user_id_fkey(name, avatar_url)')
+      .select('id, user_id, content, created_at')
       .eq('checkin_id', checkinId)
       .order('created_at');
-    if (error) throw error;
-    return (data || []).map(c => ({
-      id: c.id, user_id: c.user_id, content: c.content, created_at: c.created_at,
-      name: c.profiles?.name || '', avatar_url: c.profiles?.avatar_url || ''
+    if (error) { console.error('getComments error:', error); return []; }
+    if (!comments?.length) return [];
+
+    const userIds = [...new Set(comments.map(c => c.user_id))];
+    const { data: profiles } = await supabase
+      .from('profiles')
+      .select('id, name, avatar_url')
+      .in('id', userIds);
+    const map = Object.fromEntries((profiles || []).map(p => [p.id, p]));
+
+    return comments.map(c => ({
+      id: c.id,
+      user_id: c.user_id,
+      content: c.content,
+      created_at: c.created_at,
+      name: map[c.user_id]?.name || '',
+      avatar_url: map[c.user_id]?.avatar_url || ''
     }));
   },
 
