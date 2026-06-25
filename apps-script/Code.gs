@@ -572,6 +572,8 @@ function doPost(e) {
       else if (action === 'adminStats') result = handleAdminStats(uid);
       else if (action === 'adminUsers') result = handleAdminUsers(uid);
       else if (action === 'adminAllCheckins') result = handleAdminAllCheckins(uid);
+      else if (action === 'adminAllLikes') result = handleAdminAllLikes(uid);
+      else if (action === 'adminAllComments') result = handleAdminAllComments(uid);
       else if (action === 'adminDeleteUser') result = handleAdminDeleteUser(uid, req);
       else if (action === 'adminUpdateSettings') result = handleAdminUpdateSettings(uid, req);
       else if (action === 'adminDeleteCheckin') result = handleAdminDeleteCheckin(uid, req);
@@ -697,11 +699,29 @@ function handleAdminAllCheckins(uid) {
       like_count: c.like_count || 0,
       name: user ? user.name : 'Unknown',
       email: user ? user.email : '',
-      avatar_url: user ? user.avatar_url : ''
+      avatar_url: user ? user.avatar_url : '',
+      // Media fields included for Supabase migration
+      media_url: c.media_url || '',
+      media_type: c.media_type || '',
+      image_1: c.image_1 || '',
+      image_2: c.image_2 || '',
+      image_3: c.image_3 || '',
+      audio_url: c.audio_url || '',
+      video_url: c.video_url || ''
     });
   }
   result.sort(function(a, b) { return new Date(b.created_at) - new Date(a.created_at); });
   return {data: result};
+}
+
+// Raw dumps for Supabase migration. Admin only.
+function handleAdminAllLikes(uid) {
+  if (!isAdmin(uid)) return {error: '无权限'};
+  return {data: getTableData('likes')};
+}
+function handleAdminAllComments(uid) {
+  if (!isAdmin(uid)) return {error: '无权限'};
+  return {data: getTableData('comments')};
 }
 
 function handleAdminDeleteUser(uid, req) {
