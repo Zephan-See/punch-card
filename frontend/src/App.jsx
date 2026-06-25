@@ -5,6 +5,7 @@ import Login from './pages/Login';
 import Home from './pages/Home';
 import InstallPrompt from './components/InstallPrompt';
 import NotificationManager from './components/NotificationManager';
+import ErrorBoundary from './components/ErrorBoundary';
 
 // Lazy-loaded routes — split into separate chunks so the initial bundle
 // stays small. Each page loads on first navigation.
@@ -52,8 +53,10 @@ function AppContent() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <AppContent />
-    </AuthProvider>
+    <ErrorBoundary>
+      <AuthProvider>
+        <AppContent />
+      </AuthProvider>
+    </ErrorBoundary>
   );
 }

@@ -24,10 +24,12 @@ export default function Profile() {
     saveSettings(next);
   };
   const enableNotifications = async () => {
-    if (!('Notification' in window)) return alert('当前浏览器不支持通知');
-    if (Notification.permission === 'denied') return alert('通知已被拒绝。请到浏览器设置里重新允许。');
-    if (Notification.permission === 'default') await Notification.requestPermission();
-    updateNotif({ enabled: true });
+    if (!('Notification' in window)) return alert('当前浏览器不支持通知（iOS Safari 需先把网页加到主屏幕）');
+    try {
+      if (window.Notification.permission === 'denied') return alert('通知已被拒绝。请到浏览器设置里重新允许。');
+      if (window.Notification.permission === 'default') await window.Notification.requestPermission();
+      updateNotif({ enabled: true });
+    } catch (e) { alert('通知初始化失败：' + e.message); }
   };
 
   // 选择图片后打开裁切器
@@ -223,7 +225,7 @@ export default function Profile() {
         <div className="bg-white rounded-lg shadow-sm p-6 mb-4">
           <h3 className="font-semibold mb-4 inline-flex items-center gap-2"><Bell size={16} /> 通知</h3>
 
-          {typeof window !== 'undefined' && 'Notification' in window && Notification.permission !== 'granted' && (
+          {typeof window !== 'undefined' && 'Notification' in window && window.Notification.permission !== 'granted' && (
             <button
               onClick={enableNotifications}
               className="w-full bg-indigo-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-indigo-700 mb-3 text-sm"

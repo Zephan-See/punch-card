@@ -23,10 +23,16 @@ export function saveSettings(s) {
   localStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
 }
 
+function notifSupported() {
+  return typeof window !== 'undefined' && 'Notification' in window;
+}
+function permGranted() {
+  return notifSupported() && window.Notification.permission === 'granted';
+}
 function notify(title, body, tag) {
-  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  if (!permGranted()) return;
   try {
-    new Notification(title, { body, tag, icon: '/icon-192.png', badge: '/icon-192.png' });
+    new window.Notification(title, { body, tag, icon: '/icon-192.png', badge: '/icon-192.png' });
   } catch (e) { console.warn(e); }
 }
 
@@ -67,9 +73,9 @@ export default function NotificationManager() {
 
   // Permission banner
   useEffect(() => {
-    if (!('Notification' in window)) return;
-    if (Notification.permission === 'default' && !localStorage.getItem(PERM_PROMPTED_KEY)) {
-      const t = setTimeout(() => setShowBanner(true), 4000); // show after 4s of usage
+    if (!notifSupported()) return;
+    if (window.Notification.permission === 'default' && !localStorage.getItem(PERM_PROMPTED_KEY)) {
+      const t = setTimeout(() => setShowBanner(true), 4000);
       return () => clearTimeout(t);
     }
   }, []);
@@ -77,8 +83,8 @@ export default function NotificationManager() {
   const requestPerm = async () => {
     localStorage.setItem(PERM_PROMPTED_KEY, '1');
     setShowBanner(false);
-    if (!('Notification' in window)) return;
-    await Notification.requestPermission();
+    if (!notifSupported()) return;
+    try { await window.Notification.requestPermission(); } catch (e) { /* iOS quirks */ }
   };
   const dismissBanner = () => {
     localStorage.setItem(PERM_PROMPTED_KEY, '1');
@@ -89,7 +95,7 @@ export default function NotificationManager() {
   useEffect(() => {
     const settings = loadSettings();
     if (!settings.enabled || !settings.remindDaily) return;
-    if (Notification.permission !== 'granted') return;
+    if (!permGranted()) return;
 
     const tick = () => {
       notify('该打卡了 ✓', '坚持是最浪漫的事。点开继续 100 天挑战。', 'daily');
@@ -107,7 +113,7 @@ export default function NotificationManager() {
 
     const poll = async () => {
       if (document.visibilityState !== 'visible') return; // only when tab focused
-      if (Notification.permission !== 'granted') return;
+      if (!permGranted()) return;
 
       try {
         const checkins = await api.getMyCheckins(user.token);
