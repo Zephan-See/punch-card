@@ -9,6 +9,8 @@ import Feed from './pages/Feed';
 import Leaderboard from './pages/Leaderboard';
 import Profile from './pages/Profile';
 import AdminDashboard from './pages/admin/Dashboard';
+import InstallPrompt from './components/InstallPrompt';
+import NotificationManager from './components/NotificationManager';
 
 function AppContent() {
   const { user, loading } = useContext(AuthContext);
@@ -29,6 +31,8 @@ function AppContent() {
         <Route path="/profile" element={user ? <Profile /> : <Navigate to="/login" />} />
         <Route path="/admin" element={user ? <AdminDashboard /> : <Navigate to="/login" />} />
       </Routes>
+      <InstallPrompt />
+      {user && <NotificationManager />}
     </Router>
   );
 }

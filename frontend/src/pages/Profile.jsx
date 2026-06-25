@@ -1,6 +1,7 @@
 import { useState, useEffect, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, Settings, Check, Lock } from 'lucide-react';
+import { ChevronLeft, Settings, Check, Lock, Bell } from 'lucide-react';
+import { loadSettings, saveSettings } from '../components/NotificationManager';
 import { AuthContext } from '../AuthContext';
 import { api } from '../api';
 import AvatarCropper from '../components/AvatarCropper';
@@ -13,8 +14,21 @@ export default function Profile() {
   const [loading, setLoading] = useState(true);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [cropperImage, setCropperImage] = useState(null);
+  const [notifSettings, setNotifSettings] = useState(loadSettings());
   const { user, logout } = useContext(AuthContext);
   const navigate = useNavigate();
+
+  const updateNotif = (patch) => {
+    const next = { ...notifSettings, ...patch };
+    setNotifSettings(next);
+    saveSettings(next);
+  };
+  const enableNotifications = async () => {
+    if (!('Notification' in window)) return alert('当前浏览器不支持通知');
+    if (Notification.permission === 'denied') return alert('通知已被拒绝。请到浏览器设置里重新允许。');
+    if (Notification.permission === 'default') await Notification.requestPermission();
+    updateNotif({ enabled: true });
+  };
 
   // 选择图片后打开裁切器
   const handleAvatarUpload = (e) => {
@@ -203,6 +217,64 @@ export default function Profile() {
           </div>
           <p className="text-xs text-gray-500 mt-4 inline-flex items-center gap-1.5">
             {wallPublic ? <><Check size={12} /> 打卡墙已公开，朋友可以在排行榜查看</> : <><Lock size={12} /> 打卡墙已私密，只有你能看到</>}
+          </p>
+        </div>
+
+        <div className="bg-white rounded-lg shadow-sm p-6 mb-4">
+          <h3 className="font-semibold mb-4 inline-flex items-center gap-2"><Bell size={16} /> 通知</h3>
+
+          {typeof window !== 'undefined' && 'Notification' in window && Notification.permission !== 'granted' && (
+            <button
+              onClick={enableNotifications}
+              className="w-full bg-indigo-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-indigo-700 mb-3 text-sm"
+            >
+              开启通知权限
+            </button>
+          )}
+
+          <label className="flex items-center justify-between py-2">
+            <span className="text-sm">每日打卡提醒</span>
+            <input
+              type="checkbox"
+              checked={notifSettings.remindDaily}
+              onChange={e => updateNotif({ remindDaily: e.target.checked })}
+              className="w-5 h-5 accent-indigo-600"
+            />
+          </label>
+
+          <label className="flex items-center justify-between py-2">
+            <span className="text-sm">提醒时间</span>
+            <input
+              type="time"
+              value={notifSettings.dailyTime}
+              onChange={e => updateNotif({ dailyTime: e.target.value })}
+              className="px-3 py-1 border border-gray-300 rounded text-sm"
+              disabled={!notifSettings.remindDaily}
+            />
+          </label>
+
+          <label className="flex items-center justify-between py-2">
+            <span className="text-sm">新点赞 / 评论</span>
+            <input
+              type="checkbox"
+              checked={notifSettings.remindLikes}
+              onChange={e => updateNotif({ remindLikes: e.target.checked })}
+              className="w-5 h-5 accent-indigo-600"
+            />
+          </label>
+
+          <label className="flex items-center justify-between py-2">
+            <span className="text-sm">连击成就（7 / 30 / 100 天）</span>
+            <input
+              type="checkbox"
+              checked={notifSettings.remindStreak}
+              onChange={e => updateNotif({ remindStreak: e.target.checked })}
+              className="w-5 h-5 accent-indigo-600"
+            />
+          </label>
+
+          <p className="text-xs text-gray-500 mt-3">
+            通知只在网页打开时触发。装到主屏后效果更可靠。
           </p>
         </div>
 
