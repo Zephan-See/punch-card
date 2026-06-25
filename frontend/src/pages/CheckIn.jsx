@@ -4,17 +4,15 @@ import { ChevronLeft, Pencil, Camera, Mic, Video, Check, Lightbulb, Package, Mus
 import { AuthContext } from '../AuthContext';
 import { api } from '../api';
 
-const VIDEO_MAX_SECONDS = 10;
+const VIDEO_MAX_SECONDS = 30;
 const AUDIO_MAX_SECONDS = 60;
-const MAX_IMAGES = 3;
-// 每个媒体独立存一格（Google Sheets 单元格上限 ~50K 字符）
-const CELL_MAX_CHARS = 48000;
-const CELL_WARN_CHARS = 40000;
+const MAX_IMAGES = 10;
 
+// Supabase Storage handles size, but keep videos reasonable for upload speed
 const VIDEO_CONFIGS = [
-  { width: 320, height: 320, videoBPS: 250000, audioBPS: 32000 },
-  { width: 240, height: 240, videoBPS: 150000, audioBPS: 24000 },
-  { width: 160, height: 160, videoBPS: 80000, audioBPS: 16000 }
+  { width: 480, height: 480, videoBPS: 500000, audioBPS: 48000 },
+  { width: 360, height: 360, videoBPS: 300000, audioBPS: 32000 },
+  { width: 240, height: 240, videoBPS: 150000, audioBPS: 24000 }
 ];
 
 export default function CheckIn() {
@@ -38,38 +36,46 @@ export default function CheckIn() {
     (video?.length || 0)
   );
 
-  // 上传图片（最多 3 张，与视频互斥）
+  // 上传图片（最多 10 张，与视频互斥）
+  // 支持多选 + 相机直拍（按钮上 capture="environment"）
   const handleImageSelect = (e) => {
-    if (video) return alert('请先移除视频，图片和视频只能选一种');
-    if (images.length >= MAX_IMAGES) return alert(`最多 ${MAX_IMAGES} 张图片`);
+    if (video) { alert('请先移除视频，图片和视频只能选一种'); e.target.value = ''; return; }
 
-    const file = e.target.files[0];
-    if (!file) return;
-    if (file.size > 10 * 1024 * 1024) return alert('图片不能超过 10MB');
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const img = new Image();
-      img.onload = () => {
-        // 根据已有图片数量动态调整大小（3 张时压更小）
-        const maxDim = images.length === 0 ? 800 : (images.length === 1 ? 600 : 480);
-        const quality = images.length === 0 ? 0.75 : 0.65;
-
-        const ratio = Math.min(maxDim / img.width, maxDim / img.height, 1);
-        const w = Math.round(img.width * ratio);
-        const h = Math.round(img.height * ratio);
-        const canvas = document.createElement('canvas');
-        canvas.width = w;
-        canvas.height = h;
-        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-        const base64 = canvas.toDataURL('image/jpeg', quality);
-
-        setImages(prev => [...prev, base64]);
-      };
-      img.src = event.target.result;
-    };
-    reader.readAsDataURL(file);
+    const files = Array.from(e.target.files || []);
     e.target.value = '';
+    if (!files.length) return;
+
+    const remaining = MAX_IMAGES - images.length;
+    if (remaining <= 0) return alert(`最多 ${MAX_IMAGES} 张图片`);
+
+    const toProcess = files.slice(0, remaining);
+    if (files.length > remaining) {
+      alert(`只能再加 ${remaining} 张，多余的会被忽略`);
+    }
+
+    toProcess.forEach(file => {
+      if (file.size > 20 * 1024 * 1024) {
+        alert(`${file.name} 超过 20MB，跳过`);
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const img = new Image();
+        img.onload = () => {
+          const ratio = Math.min(1024 / img.width, 1024 / img.height, 1);
+          const w = Math.round(img.width * ratio);
+          const h = Math.round(img.height * ratio);
+          const canvas = document.createElement('canvas');
+          canvas.width = w;
+          canvas.height = h;
+          canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+          const base64 = canvas.toDataURL('image/jpeg', 0.78);
+          setImages(prev => [...prev, base64]);
+        };
+        img.src = event.target.result;
+      };
+      reader.readAsDataURL(file);
+    });
   };
 
   const removeImage = (idx) => {
@@ -205,25 +211,8 @@ export default function CheckIn() {
       return;
     }
 
-    // 检查每个独立单元格大小
-    const checks = [
-      { name: '第1张图', data: images[0] },
-      { name: '第2张图', data: images[1] },
-      { name: '第3张图', data: images[2] },
-      { name: '录音', data: audio },
-      { name: '视频', data: video }
-    ];
-    for (const c of checks) {
-      if (c.data && c.data.length > CELL_MAX_CHARS) {
-        return alert(`❌ ${c.name} ${Math.round(c.data.length/1024)}KB 超过单元格上限（${Math.round(CELL_MAX_CHARS/1024)}KB）`);
-      }
-    }
-
-    // 每个媒体存到独立字段
     const mediaFields = {
-      image_1: images[0] || '',
-      image_2: images[1] || '',
-      image_3: images[2] || '',
+      images,                  // up to 10 base64 data URLs
       audio_url: audio || '',
       video_url: video || ''
     };
@@ -263,9 +252,9 @@ export default function CheckIn() {
             onChange={(e) => setContent(e.target.value)}
           />
 
-          {/* 图片预览（最多 3 张） */}
+          {/* 图片预览（最多 10 张） */}
           {images.length > 0 && (
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-4 gap-2">
               {images.map((img, idx) => (
                 <div key={idx} className="relative aspect-square">
                   <img src={img} alt="" className="w-full h-full object-cover rounded-lg" />
@@ -330,17 +319,35 @@ export default function CheckIn() {
 
           {/* 媒体选择按钮 */}
           {!recording && (
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-4 gap-2">
               <label className={`flex flex-col items-center justify-center py-3 rounded-lg cursor-pointer transition ${
                 video || images.length >= MAX_IMAGES
                   ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
                   : 'bg-blue-50 hover:bg-blue-100 text-blue-700'
               }`}>
-                <Camera size={24} />
-                <span className="text-xs mt-1">图片 {images.length}/{MAX_IMAGES}</span>
+                <Camera size={22} />
+                <span className="text-[11px] mt-1">拍照</span>
                 <input
                   type="file"
                   accept="image/*"
+                  capture="environment"
+                  className="hidden"
+                  onChange={handleImageSelect}
+                  disabled={!!video || images.length >= MAX_IMAGES}
+                />
+              </label>
+
+              <label className={`flex flex-col items-center justify-center py-3 rounded-lg cursor-pointer transition ${
+                video || images.length >= MAX_IMAGES
+                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                  : 'bg-cyan-50 hover:bg-cyan-100 text-cyan-700'
+              }`}>
+                <Package size={22} />
+                <span className="text-[11px] mt-1">相册 {images.length}/{MAX_IMAGES}</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
                   className="hidden"
                   onChange={handleImageSelect}
                   disabled={!!video || images.length >= MAX_IMAGES}
@@ -371,18 +378,16 @@ export default function CheckIn() {
                     : 'bg-red-50 hover:bg-red-100 text-red-700'
                 }`}
               >
-                <Video size={24} />
-                <span className="text-xs mt-1 inline-flex items-center gap-1">{video ? <><Check size={12} /> 已录</> : '视频(10s)'}</span>
+                <Video size={22} />
+                <span className="text-[11px] mt-1 inline-flex items-center gap-1">{video ? <><Check size={12} /> 已录</> : `视频(${VIDEO_MAX_SECONDS}s)`}</span>
               </button>
             </div>
           )}
 
-          {/* 提示规则 + 各项大小 */}
           <div className="text-xs text-gray-500 space-y-1">
-            <p className="inline-flex items-center gap-1.5"><Lightbulb size={12} /> 图片（1-3 张）和视频二选一，录音可与图片同时存在</p>
-            <p className="inline-flex items-center gap-1.5"><Package size={12} /> 每项媒体独立存储，单项上限 {Math.round(CELL_MAX_CHARS/1024)}KB</p>
+            <p className="inline-flex items-center gap-1.5"><Lightbulb size={12} /> 图片最多 {MAX_IMAGES} 张，视频和图片二选一，录音可与图片同时</p>
             {totalSize > 0 && (
-              <p>当前媒体合计：{Math.round(totalSize / 1024)}KB（{[images.length > 0 ? `${images.length}图` : null, audio ? '录音' : null, video ? '视频' : null].filter(Boolean).join(' + ')}）</p>
+              <p>当前合计：{Math.round(totalSize / 1024)}KB（{[images.length > 0 ? `${images.length}图` : null, audio ? '录音' : null, video ? '视频' : null].filter(Boolean).join(' + ')}）</p>
             )}
           </div>
 

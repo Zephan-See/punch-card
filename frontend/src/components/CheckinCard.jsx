@@ -144,17 +144,17 @@ export default function CheckinCard({ checkin, displayName, currentUserId, token
       </div>
       <p className="text-gray-700 mb-3 whitespace-pre-wrap">{checkin.content}</p>
 
-      {/* 媒体内容展示 - 支持新分单元格格式 + 老 JSON 格式 + 老单 URL 格式 */}
+      {/* 媒体内容展示：新 images[] / 老 image_1-3 / 更老 media_url 全兼容 */}
       {(() => {
-        // 优先使用新格式：独立字段
-        let images = [];
-        if (checkin.image_1) images.push(checkin.image_1);
-        if (checkin.image_2) images.push(checkin.image_2);
-        if (checkin.image_3) images.push(checkin.image_3);
+        let images = Array.isArray(checkin.images) ? checkin.images.filter(Boolean) : [];
+        if (images.length === 0) {
+          if (checkin.image_1) images.push(checkin.image_1);
+          if (checkin.image_2) images.push(checkin.image_2);
+          if (checkin.image_3) images.push(checkin.image_3);
+        }
         let audio = checkin.audio_url || '';
         let video = checkin.video_url || '';
 
-        // 如果新字段都是空的，尝试解析老 media_url
         if (images.length === 0 && !audio && !video && checkin.media_url) {
           if (checkin.media_type === 'multi' || checkin.media_url.startsWith('{')) {
             try {
@@ -164,7 +164,6 @@ export default function CheckinCard({ checkin, displayName, currentUserId, token
               video = m.video || '';
             } catch (e) {}
           } else {
-            // 更老的单 URL 格式
             if (checkin.media_type === 'image') images = [checkin.media_url];
             else if (checkin.media_type === 'audio') audio = checkin.media_url;
             else if (checkin.media_type === 'video') video = checkin.media_url;
@@ -173,14 +172,15 @@ export default function CheckinCard({ checkin, displayName, currentUserId, token
 
         if (images.length === 0 && !audio && !video) return null;
 
+        const gridCols = images.length === 1 ? 'grid-cols-1'
+                       : images.length === 2 ? 'grid-cols-2'
+                       : images.length <= 4  ? 'grid-cols-2'
+                       :                       'grid-cols-3';
+
         return (
           <div className="mb-3 space-y-2">
-            {/* 图片画廊 */}
             {images.length > 0 && (
-              <div className={`grid gap-1 ${
-                images.length === 1 ? 'grid-cols-1' :
-                images.length === 2 ? 'grid-cols-2' : 'grid-cols-3'
-              }`}>
+              <div className={`grid gap-1 ${gridCols}`}>
                 {images.map((img, idx) => (
                   <img
                     key={idx}

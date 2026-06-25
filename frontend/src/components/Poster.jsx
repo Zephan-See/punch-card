@@ -21,7 +21,12 @@ const Poster = forwardRef(function Poster({ checkin }, ref) {
   const { text, source, sticker } = pickDaily(new Date(checkin.created_at));
   const d = formatDate(checkin.created_at);
 
-  const images = [checkin.image_1, checkin.image_2, checkin.image_3].filter(Boolean);
+  const allImages = Array.isArray(checkin.images) && checkin.images.length
+    ? checkin.images
+    : [checkin.image_1, checkin.image_2, checkin.image_3].filter(Boolean);
+  // Poster is small — show at most 4 images so they stay legible
+  const images = allImages.slice(0, 4);
+  const moreImages = Math.max(0, allImages.length - images.length);
   const hasAudio = !!checkin.audio_url;
   const hasVideo = !!checkin.video_url;
 
@@ -72,14 +77,24 @@ const Poster = forwardRef(function Poster({ checkin }, ref) {
         <div className="flex-1 px-6 pt-3 relative flex flex-col min-h-0 overflow-hidden">
           {images.length > 0 ? (
             <>
-              <div className={`grid gap-1.5 mb-2 ${images.length === 1 ? 'grid-cols-1' : images.length === 2 ? 'grid-cols-2' : 'grid-cols-3'}`}>
+              <div className={`grid gap-1.5 mb-2 relative ${
+                images.length === 1 ? 'grid-cols-1'
+                : images.length === 2 ? 'grid-cols-2'
+                : 'grid-cols-2'
+              }`}>
                 {images.map((img, idx) => (
-                  <img
-                    key={idx}
-                    src={img}
-                    alt=""
-                    className={`w-full rounded-xl object-cover ${images.length === 1 ? 'max-h-44' : 'aspect-square'}`}
-                  />
+                  <div key={idx} className="relative">
+                    <img
+                      src={img}
+                      alt=""
+                      className={`w-full rounded-xl object-cover ${images.length === 1 ? 'max-h-44' : 'aspect-square'}`}
+                    />
+                    {idx === images.length - 1 && moreImages > 0 && (
+                      <div className="absolute inset-0 bg-black/55 text-white rounded-xl flex items-center justify-center text-xl font-bold">
+                        +{moreImages}
+                      </div>
+                    )}
+                  </div>
                 ))}
               </div>
               <p className="text-sm text-gray-800 leading-relaxed whitespace-pre-wrap break-words flex-1 overflow-hidden">

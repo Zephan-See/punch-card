@@ -42,6 +42,10 @@ async function currentUserId() {
 // Map a raw checkin row + profile fields to the legacy shape
 function mapCheckin(row) {
   const p = row.profiles || {};
+  // Prefer new images[] column; fall back to legacy image_1/2/3
+  const imagesArr = Array.isArray(row.images) && row.images.length
+    ? row.images
+    : [row.image_1, row.image_2, row.image_3].filter(Boolean);
   return {
     id: row.id,
     user_id: row.user_id,
@@ -54,9 +58,11 @@ function mapCheckin(row) {
     name: p.name || '',
     avatar_url: p.avatar_url || '',
     signature: p.signature || '',
-    image_1: row.image_1 || '',
-    image_2: row.image_2 || '',
-    image_3: row.image_3 || '',
+    images: imagesArr,
+    // Legacy fields kept so existing UI code (CheckinCard, Poster) still works
+    image_1: imagesArr[0] || '',
+    image_2: imagesArr[1] || '',
+    image_3: imagesArr[2] || '',
     audio_url: row.audio_url || '',
     video_url: row.video_url || ''
   };
@@ -128,13 +134,27 @@ export const api = {
     const uid = await currentUserId();
     if (!uid) return { error: '未登录' };
     const today = new Date().toISOString().slice(0, 10);
+
+    // Accept either an `images` array or legacy image_1/2/3 props
+    const inputImages = Array.isArray(media.images)
+      ? media.images
+      : [media.image_1, media.image_2, media.image_3].filter(Boolean);
+
+    // Upload all in parallel
+    const uploadedImages = await Promise.all(
+      inputImages.map((img, i) => uploadIfDataUrl(uid, img, 'img' + (i + 1)))
+    );
+    const imagesArr = uploadedImages.filter(Boolean);
+
     const row = {
       user_id: uid,
       content,
       checked_date: today,
-      image_1: await uploadIfDataUrl(uid, media.image_1, 'img1'),
-      image_2: await uploadIfDataUrl(uid, media.image_2, 'img2'),
-      image_3: await uploadIfDataUrl(uid, media.image_3, 'img3'),
+      images: imagesArr,
+      // legacy mirror for any consumer that still reads image_1/2/3
+      image_1: imagesArr[0] || '',
+      image_2: imagesArr[1] || '',
+      image_3: imagesArr[2] || '',
       audio_url: await uploadIfDataUrl(uid, media.audio_url, 'audio'),
       video_url: await uploadIfDataUrl(uid, media.video_url, 'video')
     };
