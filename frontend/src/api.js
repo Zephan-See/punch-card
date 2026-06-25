@@ -200,6 +200,49 @@ export const api = {
     return { ok: true };
   },
 
+  // ===== goals =====
+  getGoals: async ({ activeOnly = false } = {}) => {
+    const uid = await currentUserId();
+    if (!uid) return [];
+    let q = supabase.from('goals').select('*').eq('user_id', uid).order('created_at', { ascending: false });
+    if (activeOnly) q = q.eq('active', true);
+    const { data, error } = await q;
+    if (error) return [];
+    return data || [];
+  },
+
+  createGoal: async ({ title, description = '', target_days = 100 }) => {
+    const uid = await currentUserId();
+    if (!uid) return { error: '未登录' };
+    if (!title?.trim()) return { error: '标题不能为空' };
+    const { data, error } = await supabase
+      .from('goals')
+      .insert({ user_id: uid, title: title.trim(), description: description.trim(), target_days, active: true })
+      .select().single();
+    if (error) return { error: error.message };
+    return data;
+  },
+
+  updateGoal: async (id, patch) => {
+    const { error } = await supabase.from('goals').update(patch).eq('id', id);
+    if (error) return { error: error.message };
+    return { ok: true };
+  },
+
+  deleteGoal: async (id) => {
+    const { error } = await supabase.from('goals').delete().eq('id', id);
+    if (error) return { error: error.message };
+    return { ok: true };
+  },
+
+  // Current user's total unique checkin days (used as goal progress).
+  getMyTotalDays: async () => {
+    const uid = await currentUserId();
+    if (!uid) return 0;
+    const { data } = await supabase.from('leaderboard_v').select('total_days').eq('id', uid).single();
+    return data?.total_days || 0;
+  },
+
   // ===== leaderboard / settings =====
   getLeaderboard: async () => {
     const { data, error } = await supabase

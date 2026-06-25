@@ -8,6 +8,7 @@ import Wall from './pages/Wall';
 import Feed from './pages/Feed';
 import Leaderboard from './pages/Leaderboard';
 import Profile from './pages/Profile';
+import Goals from './pages/Goals';
 import AdminDashboard from './pages/admin/Dashboard';
 import InstallPrompt from './components/InstallPrompt';
 import NotificationManager from './components/NotificationManager';
@@ -29,6 +30,7 @@ function AppContent() {
         <Route path="/feed" element={user ? <Feed /> : <Navigate to="/login" />} />
         <Route path="/leaderboard" element={user ? <Leaderboard /> : <Navigate to="/login" />} />
         <Route path="/profile" element={user ? <Profile /> : <Navigate to="/login" />} />
+        <Route path="/goals" element={user ? <Goals /> : <Navigate to="/login" />} />
         <Route path="/admin" element={user ? <AdminDashboard /> : <Navigate to="/login" />} />
       </Routes>
       <InstallPrompt />
