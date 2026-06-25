@@ -2,6 +2,7 @@ import { useState, useEffect, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../AuthContext';
 import { api } from '../api';
+import Mascot from '../components/Mascot';
 
 export default function Home() {
   const navigate = useNavigate();
@@ -46,6 +47,8 @@ export default function Home() {
             <p className="text-lg font-bold">{activityName}</p>
           </div>
         )}
+
+        <Mascot />
 
         <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
           <h2 className="text-2xl font-bold mb-2">
