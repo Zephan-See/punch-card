@@ -1,5 +1,7 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
+import * as htmlToImage from 'html-to-image';
 import { api } from '../api';
+import Poster from './Poster';
 
 const formatDateTime = (dateString) => {
   if (!dateString) return { date: '未知', time: '未知' };
@@ -15,6 +17,9 @@ export default function CheckinCard({ checkin, displayName, currentUserId, token
   const [loadingComments, setLoadingComments] = useState(false);
   const [newComment, setNewComment] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [posterUrl, setPosterUrl] = useState(null);
+  const [posterLoading, setPosterLoading] = useState(false);
+  const posterRef = useRef(null);
 
   const { date, time } = formatDateTime(checkin.created_at);
   const isOwn = checkin.user_id == currentUserId;
@@ -107,6 +112,21 @@ export default function CheckinCard({ checkin, displayName, currentUserId, token
       alert('📋 已复制到剪贴板！\n\n粘贴到微信、微博等社交媒体即可分享 ✨');
     } catch (e) {
       alert('分享失败，请手动复制');
+    }
+  };
+
+  const handlePoster = async () => {
+    if (posterLoading || !posterRef.current) return;
+    setPosterLoading(true);
+    try {
+      // wait one frame for offscreen poster to be painted
+      await new Promise(r => requestAnimationFrame(r));
+      const dataUrl = await htmlToImage.toPng(posterRef.current, { pixelRatio: 2, cacheBust: true });
+      setPosterUrl(dataUrl);
+    } catch (e) {
+      alert('生成海报失败：' + e.message);
+    } finally {
+      setPosterLoading(false);
     }
   };
 
@@ -214,7 +234,32 @@ export default function CheckinCard({ checkin, displayName, currentUserId, token
           <span>🔗</span>
           <span className="font-medium">分享</span>
         </button>
+
+        <button
+          onClick={handlePoster}
+          disabled={posterLoading}
+          className="flex items-center gap-1 px-3 py-1.5 rounded-full text-sm bg-pink-50 text-pink-600 hover:bg-pink-100 transition disabled:opacity-60"
+        >
+          <span>📸</span>
+          <span className="font-medium">{posterLoading ? '…' : '海报'}</span>
+        </button>
       </div>
+
+      {/* Offscreen poster (rendered always, captured on demand) */}
+      <div style={{ position: 'fixed', left: '-9999px', top: 0, pointerEvents: 'none' }} aria-hidden="true">
+        <Poster ref={posterRef} checkin={checkin} />
+      </div>
+
+      {posterUrl && (
+        <div
+          className="fixed inset-0 bg-black/80 z-50 flex flex-col items-center justify-center p-4"
+          onClick={() => setPosterUrl(null)}
+        >
+          <img src={posterUrl} alt="poster" className="max-h-[80vh] w-auto rounded-2xl shadow-2xl" />
+          <p className="text-white mt-4 text-sm">长按图片保存到相册</p>
+          <button onClick={() => setPosterUrl(null)} className="mt-2 text-white/70 text-xs">关闭</button>
+        </div>
+      )}
 
 
       {showComments && (
