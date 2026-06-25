@@ -1,38 +1,49 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { useContext } from 'react';
+import { useContext, lazy, Suspense } from 'react';
 import { AuthContext, AuthProvider } from './AuthContext';
 import Login from './pages/Login';
 import Home from './pages/Home';
-import CheckIn from './pages/CheckIn';
-import Wall from './pages/Wall';
-import Feed from './pages/Feed';
-import Leaderboard from './pages/Leaderboard';
-import Profile from './pages/Profile';
-import Goals from './pages/Goals';
-import AdminDashboard from './pages/admin/Dashboard';
 import InstallPrompt from './components/InstallPrompt';
 import NotificationManager from './components/NotificationManager';
+
+// Lazy-loaded routes — split into separate chunks so the initial bundle
+// stays small. Each page loads on first navigation.
+const CheckIn = lazy(() => import('./pages/CheckIn'));
+const Wall = lazy(() => import('./pages/Wall'));
+const Feed = lazy(() => import('./pages/Feed'));
+const Leaderboard = lazy(() => import('./pages/Leaderboard'));
+const Profile = lazy(() => import('./pages/Profile'));
+const Goals = lazy(() => import('./pages/Goals'));
+const AdminDashboard = lazy(() => import('./pages/admin/Dashboard'));
+
+const Loading = () => (
+  <div className="min-h-screen flex items-center justify-center">
+    <div className="w-8 h-8 border-4 border-gray-200 border-t-indigo-600 rounded-full animate-spin"></div>
+  </div>
+);
 
 function AppContent() {
   const { user, loading } = useContext(AuthContext);
 
-  if (loading) return <div className="flex items-center justify-center h-screen text-xl">加载中...</div>;
+  if (loading) return <Loading />;
 
   return (
     <Router>
-      <Routes>
-        <Route path="/login" element={!user ? <Login /> : <Navigate to="/home" />} />
-        <Route path="/" element={user ? <Navigate to="/home" /> : <Navigate to="/login" />} />
-        <Route path="/home" element={user ? <Home /> : <Navigate to="/login" />} />
-        <Route path="/checkin" element={user ? <CheckIn /> : <Navigate to="/login" />} />
-        <Route path="/wall" element={user ? <Wall /> : <Navigate to="/login" />} />
-        <Route path="/wall/:userId" element={user ? <Wall /> : <Navigate to="/login" />} />
-        <Route path="/feed" element={user ? <Feed /> : <Navigate to="/login" />} />
-        <Route path="/leaderboard" element={user ? <Leaderboard /> : <Navigate to="/login" />} />
-        <Route path="/profile" element={user ? <Profile /> : <Navigate to="/login" />} />
-        <Route path="/goals" element={user ? <Goals /> : <Navigate to="/login" />} />
-        <Route path="/admin" element={user ? <AdminDashboard /> : <Navigate to="/login" />} />
-      </Routes>
+      <Suspense fallback={<Loading />}>
+        <Routes>
+          <Route path="/login" element={!user ? <Login /> : <Navigate to="/home" />} />
+          <Route path="/" element={user ? <Navigate to="/home" /> : <Navigate to="/login" />} />
+          <Route path="/home" element={user ? <Home /> : <Navigate to="/login" />} />
+          <Route path="/checkin" element={user ? <CheckIn /> : <Navigate to="/login" />} />
+          <Route path="/wall" element={user ? <Wall /> : <Navigate to="/login" />} />
+          <Route path="/wall/:userId" element={user ? <Wall /> : <Navigate to="/login" />} />
+          <Route path="/feed" element={user ? <Feed /> : <Navigate to="/login" />} />
+          <Route path="/leaderboard" element={user ? <Leaderboard /> : <Navigate to="/login" />} />
+          <Route path="/profile" element={user ? <Profile /> : <Navigate to="/login" />} />
+          <Route path="/goals" element={user ? <Goals /> : <Navigate to="/login" />} />
+          <Route path="/admin" element={user ? <AdminDashboard /> : <Navigate to="/login" />} />
+        </Routes>
+      </Suspense>
       <InstallPrompt />
       {user && <NotificationManager />}
     </Router>

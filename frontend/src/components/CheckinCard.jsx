@@ -1,8 +1,10 @@
-import { useState, useRef } from 'react';
-import * as htmlToImage from 'html-to-image';
+import { useState, useRef, lazy, Suspense } from 'react';
 import { Heart, MessageCircle, Share2, ImageIcon, Send, Download } from 'lucide-react';
 import { api } from '../api';
-import Poster from './Poster';
+
+// Poster + its deps (html-to-image, qrcode.react) are ~150KB — only load
+// when a user actually clicks the 海报 button.
+const Poster = lazy(() => import('./Poster'));
 
 const formatDateTime = (dateString) => {
   if (!dateString) return { date: '未知', time: '未知' };
@@ -20,6 +22,7 @@ export default function CheckinCard({ checkin, displayName, currentUserId, token
   const [submitting, setSubmitting] = useState(false);
   const [posterUrl, setPosterUrl] = useState(null);
   const [posterLoading, setPosterLoading] = useState(false);
+  const [posterMounted, setPosterMounted] = useState(false);
   const posterRef = useRef(null);
 
   const { date, time } = formatDateTime(checkin.created_at);
@@ -117,11 +120,17 @@ export default function CheckinCard({ checkin, displayName, currentUserId, token
   };
 
   const handlePoster = async () => {
-    if (posterLoading || !posterRef.current) return;
+    if (posterLoading) return;
     setPosterLoading(true);
     try {
-      await new Promise(r => requestAnimationFrame(r));
-      const dataUrl = await htmlToImage.toPng(posterRef.current, { pixelRatio: 2, cacheBust: true });
+      // Mount Poster off-screen if not already; wait for it to paint
+      if (!posterMounted) setPosterMounted(true);
+      // Two RAFs to ensure layout + paint, plus a tick for fonts/images
+      await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+      await new Promise(r => setTimeout(r, 100));
+      if (!posterRef.current) throw new Error('海报组件未就绪');
+      const { toPng } = await import('html-to-image');
+      const dataUrl = await toPng(posterRef.current, { pixelRatio: 2, cacheBust: true });
       setPosterUrl(dataUrl);
     } catch (e) {
       alert('生成海报失败：' + e.message);
@@ -277,10 +286,14 @@ export default function CheckinCard({ checkin, displayName, currentUserId, token
         </button>
       </div>
 
-      {/* Offscreen poster (rendered always, captured on demand) */}
-      <div style={{ position: 'fixed', left: '-9999px', top: 0, pointerEvents: 'none' }} aria-hidden="true">
-        <Poster ref={posterRef} checkin={checkin} />
-      </div>
+      {/* Off-screen poster — only mounted after first 海报 click */}
+      {posterMounted && (
+        <div style={{ position: 'fixed', left: '-9999px', top: 0, pointerEvents: 'none' }} aria-hidden="true">
+          <Suspense fallback={null}>
+            <Poster ref={posterRef} checkin={checkin} />
+          </Suspense>
+        </div>
+      )}
 
       {posterUrl && (
         <div

@@ -7,11 +7,12 @@ const PERM_PROMPTED_KEY = 'notif_perm_prompted';
 const SETTINGS_KEY = 'notif_settings';
 const SEEN_COUNTS_KEY = 'notif_seen_counts';     // { [checkinId]: { likes, comments } }
 const SEEN_STREAKS_KEY = 'notif_seen_streaks';   // [7, 30, 100]
+const SEEN_GOALS_KEY = 'notif_seen_goals';       // [goalId, goalId, ...]
 
 const POLL_MS = 5 * 60_000;     // 5 minutes — keeps Apps Script under quota
 const MILESTONES = [7, 14, 30, 50, 100];
 
-export const defaultSettings = { enabled: true, dailyTime: '21:00', remindDaily: true, remindLikes: true, remindStreak: true };
+export const defaultSettings = { enabled: true, dailyTime: '21:00', remindDaily: true, remindLikes: true, remindStreak: true, remindGoal: true };
 
 export function loadSettings() {
   try {
@@ -135,6 +136,20 @@ export default function NotificationManager() {
           if (hit) {
             notify(`连续打卡 ${hit} 天 🎉`, '了不起！截图发朋友圈炫耀一下？', 'streak');
             localStorage.setItem(SEEN_STREAKS_KEY, JSON.stringify([...seen, hit]));
+          }
+        }
+
+        // Goal completion
+        if (settings.remindGoal) {
+          const [goals, totalDays] = await Promise.all([
+            api.getGoals({ activeOnly: true }),
+            api.getMyTotalDays()
+          ]);
+          const seen = JSON.parse(localStorage.getItem(SEEN_GOALS_KEY) || '[]');
+          const done = goals.find(g => totalDays >= g.target_days && !seen.includes(g.id));
+          if (done) {
+            notify(`目标达成 🏁`, `「${done.title}」${done.target_days} 天完成！`, 'goal-' + done.id);
+            localStorage.setItem(SEEN_GOALS_KEY, JSON.stringify([...seen, done.id]));
           }
         }
       } catch (e) { /* silent */ }

@@ -273,6 +273,16 @@ export default function Profile() {
             />
           </label>
 
+          <label className="flex items-center justify-between py-2">
+            <span className="text-sm">目标达成提醒</span>
+            <input
+              type="checkbox"
+              checked={notifSettings.remindGoal}
+              onChange={e => updateNotif({ remindGoal: e.target.checked })}
+              className="w-5 h-5 accent-indigo-600"
+            />
+          </label>
+
           <p className="text-xs text-gray-500 mt-3">
             通知只在网页打开时触发。装到主屏后效果更可靠。
           </p>
