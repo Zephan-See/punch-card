@@ -55,7 +55,7 @@ export default function Feed() {
               currentUserId={user?.id}
               token={user?.token}
               onUpdate={(updates) => updateCheckin(checkin.id, updates)}
-              allowComment={checkin.user_id == user?.id}
+              allowComment={true}
             />
           ))
         ) : (

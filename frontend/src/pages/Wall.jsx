@@ -102,7 +102,7 @@ export default function Wall() {
               currentUserId={user?.id}
               token={user?.token}
               onUpdate={(updates) => updateCheckin(checkin.id, updates)}
-              allowComment={!viewingFriend}
+              allowComment={true}
             />
           ))
         ) : (
