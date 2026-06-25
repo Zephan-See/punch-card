@@ -32,9 +32,11 @@ async function uploadIfDataUrl(userId, value, prefix) {
   return uploadMedia(userId, blob, prefix);
 }
 
+// Use the locally cached session — no network round-trip, no JWT-verify
+// failures on flaky mobile networks. getSession() reads from localStorage.
 async function currentUserId() {
-  const { data } = await supabase.auth.getUser();
-  return data.user?.id || null;
+  const { data } = await supabase.auth.getSession();
+  return data.session?.user?.id || null;
 }
 
 // Map a feed_v row to the legacy shape used by UI components.
@@ -93,8 +95,24 @@ export const api = {
   getProfile: async () => {
     const uid = await currentUserId();
     if (!uid) return { error: '未登录' };
-    const { data, error } = await supabase.from('profiles').select('*').eq('id', uid).single();
-    if (error) return { error: error.message };
+    // maybeSingle: returns null cleanly if no row, no row-count error
+    const { data, error } = await supabase.from('profiles').select('*').eq('id', uid).maybeSingle();
+    if (error) { console.error('getProfile error:', error); return { error: error.message }; }
+    if (!data) {
+      // Profile row missing — recover by creating one from auth metadata.
+      const { data: sess } = await supabase.auth.getSession();
+      const u = sess.session?.user;
+      const fallback = {
+        id: uid,
+        name: u?.user_metadata?.name || u?.email?.split('@')[0] || '用户',
+        avatar_url: '',
+        signature: '',
+        wall_public: true,
+        is_admin: false
+      };
+      await supabase.from('profiles').insert(fallback).select().maybeSingle();
+      return fallback;
+    }
     return data;
   },
 
