@@ -179,17 +179,28 @@ export default function CheckinCard({ checkin, displayName, currentUserId, token
       }
       if (!posterRef.current) throw new Error('海报组件未就绪');
 
-      // Even with data URLs the browser still decodes async — wait for that
+      // Wait for every <img> to fully decode. img.decode() is the most
+      // reliable signal across browsers — Safari especially has quirks
+      // where 'load' fires before pixels are decoded.
       const imgs = Array.from(posterRef.current.querySelectorAll('img'));
-      await Promise.all(imgs.map(img => new Promise(resolve => {
-        const done = () => resolve();
-        img.addEventListener('load', done, { once: true });
-        img.addEventListener('error', done, { once: true });
-        if (img.complete && img.naturalWidth > 0) done();
-        setTimeout(done, 5000);
-      })));
+      await Promise.all(imgs.map(async img => {
+        try {
+          // First make sure the src is set and loaded
+          if (!(img.complete && img.naturalWidth > 0)) {
+            await new Promise(resolve => {
+              img.addEventListener('load', resolve, { once: true });
+              img.addEventListener('error', resolve, { once: true });
+              setTimeout(resolve, 5000);
+            });
+          }
+          // Then ensure pixels are decoded and ready to paint
+          if (img.decode) await img.decode().catch(() => {});
+        } catch (e) { /* don't block on a single bad image */ }
+      }));
 
+      // Extra paint cycles — iOS Safari sometimes needs more than two
       await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+      await new Promise(r => setTimeout(r, 150));
 
       const { toPng } = await import('html-to-image');
       const dataUrl = await toPng(posterRef.current, { pixelRatio: 2 });
