@@ -13,7 +13,7 @@ export default function Mascot() {
       <div className="relative flex-1 bg-white rounded-2xl px-4 py-3 shadow-md">
         {/* tail pointing left toward the sticker */}
         <div className="absolute -left-2 top-1/2 -translate-y-1/2 w-0 h-0 border-y-8 border-y-transparent border-r-[10px] border-r-white" />
-        <p className="text-sm text-gray-800 leading-relaxed">{text}</p>
+        <p className="text-sm text-gray-800 leading-relaxed whitespace-pre-line">{text.replace(/([，；])/g, '$1\n')}</p>
         <p className="text-xs text-gray-400 mt-1.5">— {source}</p>
       </div>
     </div>

@@ -132,7 +132,7 @@ const Poster = forwardRef(function Poster({ checkin }, ref) {
             <div className="relative flex-1 min-w-0 bg-white rounded-2xl px-3 py-2.5 shadow-sm border border-indigo-100/60">
               <div className="absolute -left-1.5 top-1/2 -translate-y-1/2 w-0 h-0 border-y-[7px] border-y-transparent border-r-[9px] border-r-white" />
               <p className="text-[10px] text-indigo-500 tracking-widest font-medium mb-0.5">今日金句</p>
-              <p className="text-sm text-gray-900 leading-snug font-medium">{text}</p>
+              <p className="text-sm text-gray-900 leading-snug font-medium whitespace-pre-line">{text.replace(/([，；])/g, '$1\n')}</p>
               <p className="text-[10px] text-gray-400 mt-1">— {source}</p>
             </div>
 
