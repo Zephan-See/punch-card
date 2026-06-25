@@ -1,6 +1,6 @@
 import { useState, useEffect, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { CalendarDays, Pin, Pencil, Lightbulb, Camera, Radio, Trophy, Settings, Shield, Target } from 'lucide-react';
+import { CalendarDays, Pin, Pencil, Lightbulb, Camera, Radio, Trophy, Settings, Shield, Target, UserPlus } from 'lucide-react';
 import { AuthContext } from '../AuthContext';
 import { api } from '../api';
 import Mascot from '../components/Mascot';
@@ -32,6 +32,15 @@ export default function Home() {
   }, [user]);
 
   const today = new Date().toLocaleDateString('zh-CN');
+
+  const inviteViaWhatsApp = () => {
+    const origin = typeof window !== 'undefined' ? window.location.origin : '';
+    const uid = profile?.id || user?.id || '';
+    const days = totalDays > 0 ? `我已经坚持 ${totalDays} 天了，` : '';
+    const text = `${days}邀请你一起 100 天打卡。\n\n点这里加入 👉 ${origin}/login?ref=${uid}`;
+    const url = `https://wa.me/?text=${encodeURIComponent(text)}`;
+    window.open(url, '_blank');
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -125,6 +134,13 @@ export default function Home() {
             <Settings size={18} /> 设置
           </button>
         </div>
+
+        <button
+          onClick={inviteViaWhatsApp}
+          className="w-full bg-green-500 hover:bg-green-600 text-white px-4 py-3 rounded-lg font-medium transition inline-flex items-center justify-center gap-2 shadow-sm"
+        >
+          <UserPlus size={18} /> 邀请好友（WhatsApp）
+        </button>
 
         {isAdmin && (
           <button

@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 import * as htmlToImage from 'html-to-image';
-import { Heart, MessageCircle, Share2, ImageIcon } from 'lucide-react';
+import { Heart, MessageCircle, Share2, ImageIcon, Send, Download } from 'lucide-react';
 import { api } from '../api';
 import Poster from './Poster';
 
@@ -120,7 +120,6 @@ export default function CheckinCard({ checkin, displayName, currentUserId, token
     if (posterLoading || !posterRef.current) return;
     setPosterLoading(true);
     try {
-      // wait one frame for offscreen poster to be painted
       await new Promise(r => requestAnimationFrame(r));
       const dataUrl = await htmlToImage.toPng(posterRef.current, { pixelRatio: 2, cacheBust: true });
       setPosterUrl(dataUrl);
@@ -129,6 +128,38 @@ export default function CheckinCard({ checkin, displayName, currentUserId, token
     } finally {
       setPosterLoading(false);
     }
+  };
+
+  const sharePoster = async () => {
+    if (!posterUrl) return;
+    try {
+      const blob = await (await fetch(posterUrl)).blob();
+      const file = new File([blob], `checkin-${checkin.id}.png`, { type: 'image/png' });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({
+          files: [file],
+          title: '我的打卡',
+          text: '我在挑战 100 天打卡。来一起？'
+        });
+      } else {
+        // Fallback: trigger download
+        const a = document.createElement('a');
+        a.href = posterUrl;
+        a.download = `checkin-${checkin.id}.png`;
+        a.click();
+        alert('海报已下载，去 WhatsApp 上传到 Status / 分享');
+      }
+    } catch (e) {
+      if (e.name !== 'AbortError') alert('分享失败：' + e.message);
+    }
+  };
+
+  const downloadPoster = () => {
+    if (!posterUrl) return;
+    const a = document.createElement('a');
+    a.href = posterUrl;
+    a.download = `checkin-${checkin.id}.png`;
+    a.click();
   };
 
   return (
@@ -256,9 +287,23 @@ export default function CheckinCard({ checkin, displayName, currentUserId, token
           className="fixed inset-0 bg-black/80 z-50 flex flex-col items-center justify-center p-4"
           onClick={() => setPosterUrl(null)}
         >
-          <img src={posterUrl} alt="poster" className="max-h-[80vh] w-auto rounded-2xl shadow-2xl" />
-          <p className="text-white mt-4 text-sm">长按图片保存到相册</p>
-          <button onClick={() => setPosterUrl(null)} className="mt-2 text-white/70 text-xs">关闭</button>
+          <img src={posterUrl} alt="poster" className="max-h-[70vh] w-auto rounded-2xl shadow-2xl" onClick={e => e.stopPropagation()} />
+          <div className="flex gap-2 mt-4" onClick={e => e.stopPropagation()}>
+            <button
+              onClick={sharePoster}
+              className="bg-green-500 hover:bg-green-600 text-white px-4 py-2.5 rounded-full font-medium inline-flex items-center gap-2 shadow-lg"
+            >
+              <Send size={16} /> 分享 / 发到 Status
+            </button>
+            <button
+              onClick={downloadPoster}
+              className="bg-white/10 hover:bg-white/20 text-white px-4 py-2.5 rounded-full font-medium inline-flex items-center gap-2"
+            >
+              <Download size={16} /> 保存
+            </button>
+          </div>
+          <p className="text-white/70 mt-3 text-xs">长按图片也可保存</p>
+          <button onClick={() => setPosterUrl(null)} className="mt-2 text-white/50 text-xs">关闭</button>
         </div>
       )}
 
