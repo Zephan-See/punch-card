@@ -82,7 +82,7 @@ export default function CheckinCard({ checkin, displayName, currentUserId, token
   };
 
   const handleDeleteComment = async (commentId) => {
-    if (!confirm('删除这条补充说明？')) return;
+    if (!confirm('删除这条留言？')) return;
     const res = await api.deleteComment(token, commentId);
     if (res.error) {
       alert(res.error);
@@ -266,7 +266,7 @@ export default function CheckinCard({ checkin, displayName, currentUserId, token
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm bg-gray-50 text-gray-600 hover:bg-gray-100 transition"
           >
             <MessageCircle size={16} strokeWidth={2} />
-            <span className="font-medium">补充 {checkin.comment_count || 0}</span>
+            <span className="font-medium">{isOwn ? '补充' : '鼓励'} {checkin.comment_count || 0}</span>
           </button>
         )}
 
@@ -337,7 +337,7 @@ export default function CheckinCard({ checkin, displayName, currentUserId, token
           ) : (
             <>
               {comments.length === 0 ? (
-                <p className="text-xs text-gray-400 text-center py-2">还没有补充说明</p>
+                <p className="text-xs text-gray-400 text-center py-2">{isOwn ? '还没有补充' : '还没有鼓励，来留一句'}</p>
               ) : (
                 comments.map(c => (
                   <div key={c.id} className="bg-white rounded-lg p-3 mb-2 border-l-4 border-indigo-400">
@@ -361,11 +361,11 @@ export default function CheckinCard({ checkin, displayName, currentUserId, token
                 ))
               )}
 
-              {isOwn && token && (
+              {token && (
                 <div className="mt-3 flex gap-2">
                   <input
                     type="text"
-                    placeholder="添加补充说明..."
+                    placeholder={isOwn ? '添加补充说明...' : '留一句鼓励...'}
                     maxLength="100"
                     className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                     value={newComment}
