@@ -8,7 +8,7 @@ export default function Mascot() {
       <img
         src={sticker}
         alt=""
-        className="w-28 h-28 object-contain flex-shrink-0 drop-shadow-md"
+        className="w-28 h-28 object-contain flex-shrink-0"
       />
       <div className="relative flex-1 bg-white rounded-2xl px-4 py-3 shadow-md">
         {/* tail pointing left toward the sticker */}
