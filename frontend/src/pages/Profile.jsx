@@ -62,18 +62,26 @@ export default function Profile() {
     if (!user?.token) return;
     setLoading(true);
     api.getProfile(user.token).then(data => {
-      if (!data.error) {
+      if (!data?.error) {
         setProfile(data);
-        setWallPublic(data.wall_public === 1);
-        setEditForm({ signature: data.signature || '', avatar: data.avatar_url || '' });
+        // Supabase returns boolean; legacy Apps Script returned 1/0 — accept both
+        setWallPublic(data.wall_public === true || data.wall_public === 1);
       }
     }).finally(() => setLoading(false));
   }, [user]);
 
+  // Keep edit form in sync with profile so opening 编辑 always shows current values,
+  // even if the user clicks 编辑 before the initial fetch finishes.
+  useEffect(() => {
+    if (profile) {
+      setEditForm({ signature: profile.signature || '', avatar: profile.avatar_url || '' });
+    }
+  }, [profile]);
+
   const handleToggleWallPublic = async () => {
     const newStatus = !wallPublic;
     try {
-      await api.updateProfile(user.token, { wall_public: newStatus ? 1 : 0 });
+      await api.updateProfile(user.token, { wall_public: newStatus });
       setWallPublic(newStatus);
     } catch (e) {
       alert('设置失败');
