@@ -130,25 +130,43 @@ export default function CheckinCard({ checkin, displayName, currentUserId, token
     setPosterLoading(true);
     try {
       if (!posterMounted) setPosterMounted(true);
-      // Two RAFs so React commits + browser paints the poster
-      await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+
+      // 1. Wait until React actually committed and posterRef is populated
+      //    AND it contains <img> elements. Polled with RAF — robust against
+      //    React 18 async commit timing.
+      const start = Date.now();
+      while (Date.now() - start < 5000) {
+        if (
+          posterRef.current &&
+          posterRef.current.querySelectorAll('img').length > 0
+        ) break;
+        await new Promise(r => requestAnimationFrame(r));
+      }
       if (!posterRef.current) throw new Error('海报组件未就绪');
 
-      // Wait for every <img> in the poster to finish loading; otherwise
-      // html-to-image captures empty placeholders on first click.
+      // 2. Wait for every <img> to actually finish loading. Check complete
+      //    AFTER attaching listeners to avoid the "loaded between check and
+      //    listen" race. Safety timeout per image so one slow fetch can't
+      //    hang forever.
       const imgs = Array.from(posterRef.current.querySelectorAll('img'));
-      await Promise.all(imgs.map(img => {
-        if (img.complete && img.naturalWidth > 0) return Promise.resolve();
-        return new Promise(resolve => {
-          img.addEventListener('load', resolve, { once: true });
-          img.addEventListener('error', resolve, { once: true });
-        });
-      }));
+      await Promise.all(imgs.map(img => new Promise(resolve => {
+        const done = () => resolve();
+        img.addEventListener('load', done, { once: true });
+        img.addEventListener('error', done, { once: true });
+        // Already loaded? resolve immediately
+        if (img.complete && img.naturalWidth > 0) done();
+        // Hard cap so a stuck image can't block forever
+        setTimeout(done, 8000);
+      })));
+
+      // 3. One more paint cycle so any layout reflow finishes
+      await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
 
       const { toPng } = await import('html-to-image');
-      // cacheBust would re-fetch every image with a ?v= query, racing again.
-      // Leave it off so html-to-image reuses the now-loaded <img> elements.
-      const dataUrl = await toPng(posterRef.current, { pixelRatio: 2 });
+      const dataUrl = await toPng(posterRef.current, {
+        pixelRatio: 2,
+        fetchRequestInit: { mode: 'cors' }
+      });
       setPosterUrl(dataUrl);
     } catch (e) {
       alert('生成海报失败：' + e.message);

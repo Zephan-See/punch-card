@@ -47,7 +47,7 @@ const Poster = forwardRef(function Poster({ checkin }, ref) {
         {/* Header */}
         <div className="px-6 pt-5 flex items-center gap-3">
           {checkin.avatar_url ? (
-            <img src={checkin.avatar_url} alt="" className="w-12 h-12 rounded-full object-cover ring-2 ring-indigo-100" />
+            <img src={checkin.avatar_url} alt="" crossOrigin="anonymous" className="w-12 h-12 rounded-full object-cover ring-2 ring-indigo-100" />
           ) : (
             <div className="w-12 h-12 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 text-white flex items-center justify-center text-xl font-bold ring-2 ring-indigo-100">
               {initial(checkin.name)}
@@ -87,6 +87,7 @@ const Poster = forwardRef(function Poster({ checkin }, ref) {
                     <img
                       src={img}
                       alt=""
+                      crossOrigin="anonymous"
                       className={`w-full rounded-xl object-cover ${images.length === 1 ? 'max-h-44' : 'aspect-square'}`}
                     />
                     {idx === images.length - 1 && moreImages > 0 && (
