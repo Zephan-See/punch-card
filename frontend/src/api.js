@@ -161,7 +161,11 @@ export const api = {
       video_url: await uploadIfDataUrl(uid, media.video_url, 'video')
     };
     const { data, error } = await supabase.from('checkins').insert(row).select().single();
-    if (error) return { error: error.code === '23505' ? '今天已打卡' : error.message };
+    if (error) {
+      if (error.code === '23505') return { error: '今天已打卡' };
+      if (/row-level security/i.test(error.message)) return { error: '你的账号已被冻结，无法发布打卡。请联系管理员' };
+      return { error: error.message };
+    }
     return { id: data.id };
   },
 
@@ -313,15 +317,22 @@ export const api = {
   adminUsers: async () => {
     const { data, error } = await supabase.from('leaderboard_v').select('*');
     if (error) return [];
-    // get email + is_admin via separate query (leaderboard_v doesn't have them)
-    const { data: extra } = await supabase.from('profiles').select('id, is_admin, created_at');
+    // get email + is_admin + frozen via separate query (leaderboard_v doesn't have them)
+    const { data: extra } = await supabase.from('profiles').select('id, is_admin, frozen, created_at');
     const map = Object.fromEntries((extra || []).map(p => [p.id, p]));
     return (data || []).map(u => ({
       ...u,
       is_admin: map[u.id]?.is_admin || false,
+      frozen: map[u.id]?.frozen || false,
       created_at: map[u.id]?.created_at,
       email: ''  // emails live in auth.users; not exposed by RLS — skip for now
     }));
+  },
+
+  adminToggleFreeze: async (_token, userId, frozen) => {
+    const { error } = await supabase.from('profiles').update({ frozen }).eq('id', userId);
+    if (error) return { error: error.message };
+    return { ok: true };
   },
 
   adminAllCheckins: async () => {

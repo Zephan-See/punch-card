@@ -70,6 +70,15 @@ export default function AdminDashboard() {
     else { alert('✅ 已删除'); loadAll(); }
   };
 
+  const handleToggleFreeze = async (userId, name, isFrozen) => {
+    const next = !isFrozen;
+    const verb = next ? '冻结' : '解冻';
+    if (!confirm(`确定${verb}用户 "${name}" 吗？\n\n${next ? '冻结后将无法发布打卡、评论、点赞，但仍可登录浏览' : '解除限制，恢复正常使用'}`)) return;
+    const res = await api.adminToggleFreeze(user.token, userId, next);
+    if (res.error) alert('❌ ' + res.error);
+    else { alert(`✅ 已${verb}`); loadAll(); }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* 顶部导航 - 手机适配 */}
@@ -215,6 +224,7 @@ export default function AdminDashboard() {
                     <div className="flex items-center gap-1.5 flex-wrap">
                       <p className="font-semibold truncate text-sm">{u.name}</p>
                       {u.is_admin && <span className="text-xs bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded">Admin</span>}
+                      {u.frozen && <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">已冻结</span>}
                       {!u.wall_public && <span className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">私密</span>}
                     </div>
                     <p className="text-xs text-gray-500 truncate">{u.email}</p>
@@ -223,12 +233,20 @@ export default function AdminDashboard() {
                   <div className="text-right flex-shrink-0">
                     <p className="text-sm font-bold text-indigo-600">{u.total_days}天</p>
                     {!u.is_admin && (
-                      <button
-                        onClick={() => handleDeleteUser(u.id, u.name)}
-                        className="text-xs text-red-500 mt-1"
-                      >
-                        删除
-                      </button>
+                      <div className="flex flex-col items-end gap-1 mt-1">
+                        <button
+                          onClick={() => handleToggleFreeze(u.id, u.name, u.frozen)}
+                          className={`text-xs ${u.frozen ? 'text-green-600' : 'text-blue-500'}`}
+                        >
+                          {u.frozen ? '解冻' : '冻结'}
+                        </button>
+                        <button
+                          onClick={() => handleDeleteUser(u.id, u.name)}
+                          className="text-xs text-red-500"
+                        >
+                          删除
+                        </button>
+                      </div>
                     )}
                   </div>
                 </div>
