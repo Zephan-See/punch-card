@@ -320,6 +320,15 @@ export default function CheckinCard({ checkin, displayName, currentUserId, token
         </div>
       )}
 
+      {/* Loading overlay: shown the moment user taps 海报, until the PNG is ready */}
+      {posterLoading && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex flex-col items-center justify-center">
+          <div className="w-12 h-12 border-4 border-white/30 border-t-white rounded-full animate-spin"></div>
+          <p className="text-white/90 text-sm mt-4 font-medium">生成海报中…</p>
+          <p className="text-white/60 text-xs mt-1">正在加载图片</p>
+        </div>
+      )}
+
       {posterUrl && (
         <div
           className="fixed inset-0 bg-black/80 z-50 flex flex-col items-center justify-center p-4"

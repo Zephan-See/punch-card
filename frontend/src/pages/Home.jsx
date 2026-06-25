@@ -33,13 +33,25 @@ export default function Home() {
 
   const today = new Date().toLocaleDateString('zh-CN');
 
-  const inviteViaWhatsApp = () => {
+  const inviteViaWhatsApp = async () => {
     const origin = typeof window !== 'undefined' ? window.location.origin : '';
     const uid = profile?.id || user?.id || '';
     const days = totalDays > 0 ? `我已经坚持 ${totalDays} 天了，` : '';
-    const text = `${days}邀请你一起 100 天打卡。\n\n点这里加入 👉 ${origin}/login?ref=${uid}`;
-    const url = `https://wa.me/?text=${encodeURIComponent(text)}`;
-    window.open(url, '_blank');
+    const text = `${days}邀请你一起 100 天打卡。`;
+    const url = `${origin}/login?ref=${uid}`;
+
+    // Try native share sheet first (iOS / Android show WhatsApp + everything else)
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: '一起打卡', text, url });
+        return;
+      } catch (e) {
+        if (e.name === 'AbortError') return;
+        // any other error falls through to wa.me
+      }
+    }
+    // Desktop / unsupported: wa.me as fallback
+    window.open(`https://wa.me/?text=${encodeURIComponent(text + '\n\n' + url)}`, '_blank');
   };
 
   return (
@@ -139,7 +151,7 @@ export default function Home() {
           onClick={inviteViaWhatsApp}
           className="w-full bg-green-500 hover:bg-green-600 text-white px-4 py-3 rounded-lg font-medium transition inline-flex items-center justify-center gap-2 shadow-sm"
         >
-          <UserPlus size={18} /> 邀请好友（WhatsApp）
+          <UserPlus size={18} /> 邀请好友
         </button>
 
         {isAdmin && (
