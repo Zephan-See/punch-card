@@ -270,26 +270,31 @@ export default function CheckinCard({ checkin, displayName, currentUserId, token
           </button>
         )}
 
-        <button
-          onClick={handleShare}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm bg-indigo-50 text-indigo-600 hover:bg-indigo-100 transition"
-        >
-          <Share2 size={16} strokeWidth={2} />
-          <span className="font-medium">分享</span>
-        </button>
+        {/* Share + Poster only for the owner — you don't share other people's checkins */}
+        {isOwn && (
+          <>
+            <button
+              onClick={handleShare}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm bg-indigo-50 text-indigo-600 hover:bg-indigo-100 transition"
+            >
+              <Share2 size={16} strokeWidth={2} />
+              <span className="font-medium">分享</span>
+            </button>
 
-        <button
-          onClick={handlePoster}
-          disabled={posterLoading}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm bg-pink-50 text-pink-600 hover:bg-pink-100 transition disabled:opacity-60"
-        >
-          <ImageIcon size={16} strokeWidth={2} />
-          <span className="font-medium">{posterLoading ? '…' : '海报'}</span>
-        </button>
+            <button
+              onClick={handlePoster}
+              disabled={posterLoading}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm bg-pink-50 text-pink-600 hover:bg-pink-100 transition disabled:opacity-60"
+            >
+              <ImageIcon size={16} strokeWidth={2} />
+              <span className="font-medium">{posterLoading ? '…' : '海报'}</span>
+            </button>
+          </>
+        )}
       </div>
 
-      {/* Off-screen poster — only mounted after first 海报 click */}
-      {posterMounted && (
+      {/* Off-screen poster — only mounted (and lazy-loaded) for own checkins */}
+      {isOwn && posterMounted && (
         <div style={{ position: 'fixed', left: '-9999px', top: 0, pointerEvents: 'none' }} aria-hidden="true">
           <Suspense fallback={null}>
             <Poster ref={posterRef} checkin={checkin} />
