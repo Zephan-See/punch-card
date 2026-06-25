@@ -282,8 +282,15 @@ export default function CheckinCard({ checkin, displayName, currentUserId, token
     a.click();
   };
 
+  const isHidden = !!checkin.hidden_at;
+
   return (
-    <div className="bg-white rounded-lg shadow-sm p-4 mb-4">
+    <div className={`bg-white rounded-lg shadow-sm p-4 mb-4 ${isHidden ? 'opacity-70 border border-yellow-300' : ''}`}>
+      {isHidden && (
+        <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 text-xs px-3 py-2 rounded-md mb-3">
+          这条打卡已被管理员隐藏，仅你自己可见，无法分享
+        </div>
+      )}
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           {checkin.avatar_url && <img src={checkin.avatar_url} alt="" loading="lazy" decoding="async" className="w-8 h-8 rounded-full" />}
@@ -381,8 +388,8 @@ export default function CheckinCard({ checkin, displayName, currentUserId, token
           </button>
         )}
 
-        {/* Share + Poster only for the owner — you don't share other people's checkins */}
-        {isOwn && (
+        {/* Share + Poster only for the owner — and only if not hidden by admin */}
+        {isOwn && !isHidden && (
           <>
             <button
               onClick={handleShare}

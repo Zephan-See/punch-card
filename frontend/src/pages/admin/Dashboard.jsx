@@ -64,10 +64,19 @@ export default function AdminDashboard() {
   };
 
   const handleDeleteCheckin = async (checkinId) => {
-    if (!confirm('⚠️ 删除这条打卡？')) return;
+    if (!confirm('⚠️ 永久删除这条打卡？\n\n如果只是想暂时隐藏，请用「隐藏」按钮')) return;
     const res = await api.adminDeleteCheckin(user.token, checkinId);
     if (res.error) alert('❌ ' + res.error);
     else { alert('✅ 已删除'); loadAll(); }
+  };
+
+  const handleToggleHideCheckin = async (checkinId, isHidden) => {
+    const next = !isHidden;
+    const verb = next ? '隐藏' : '取消隐藏';
+    if (!confirm(`${verb}这条打卡？\n\n${next ? '隐藏后所有人（含本人）无法看到、无法分享，但内容仍保留' : '恢复显示在动态流 / 打卡墙'}`)) return;
+    const res = await api.adminToggleHideCheckin(user.token, checkinId, next);
+    if (res.error) alert('❌ ' + res.error);
+    else { alert(`✅ 已${verb}`); loadAll(); }
   };
 
   const handleToggleFreeze = async (userId, name, isFrozen) => {
@@ -269,15 +278,26 @@ export default function AdminDashboard() {
                     </div>
                   )}
                   <div className="flex-1 min-w-0">
-                    <p className="font-medium text-sm truncate">{c.name}</p>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <p className="font-medium text-sm truncate">{c.name}</p>
+                      {c.hidden_at && <span className="text-xs bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded">已隐藏</span>}
+                    </div>
                     <p className="text-xs text-gray-500">{new Date(c.created_at).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}</p>
                   </div>
-                  <button
-                    onClick={() => handleDeleteCheckin(c.id)}
-                    className="text-xs text-red-500"
-                  >
-                    删除
-                  </button>
+                  <div className="flex flex-col items-end gap-1">
+                    <button
+                      onClick={() => handleToggleHideCheckin(c.id, !!c.hidden_at)}
+                      className={`text-xs ${c.hidden_at ? 'text-green-600' : 'text-yellow-600'}`}
+                    >
+                      {c.hidden_at ? '取消隐藏' : '隐藏'}
+                    </button>
+                    <button
+                      onClick={() => handleDeleteCheckin(c.id)}
+                      className="text-xs text-red-500"
+                    >
+                      删除
+                    </button>
+                  </div>
                 </div>
                 <p className="text-gray-700 ml-10 whitespace-pre-wrap text-sm">{c.content}</p>
                 <p className="text-xs text-gray-400 mt-1 ml-10 inline-flex items-center gap-1"><Heart size={11} fill="currentColor" /> {c.like_count}</p>

@@ -61,7 +61,8 @@ function mapCheckin(row) {
     image_2: imagesArr[1] || '',
     image_3: imagesArr[2] || '',
     audio_url: row.audio_url || '',
-    video_url: row.video_url || ''
+    video_url: row.video_url || '',
+    hidden_at: row.hidden_at || null
   };
 }
 
@@ -350,6 +351,15 @@ export const api = {
 
   adminDeleteCheckin: async (_token, checkinId) => {
     const { error } = await supabase.from('checkins').delete().eq('id', checkinId);
+    if (error) return { error: error.message };
+    return { ok: true };
+  },
+
+  adminToggleHideCheckin: async (_token, checkinId, hide) => {
+    const { error } = await supabase
+      .from('checkins')
+      .update({ hidden_at: hide ? new Date().toISOString() : null })
+      .eq('id', checkinId);
     if (error) return { error: error.message };
     return { ok: true };
   },
