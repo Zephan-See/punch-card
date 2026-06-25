@@ -1,5 +1,6 @@
 import { forwardRef } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
+import { Mic, Film } from 'lucide-react';
 import { pickDaily } from '../quotes';
 
 const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六'];
@@ -95,12 +96,12 @@ const Poster = forwardRef(function Poster({ checkin }, ref) {
             <div className="flex gap-2 mt-2 flex-wrap">
               {hasAudio && (
                 <span className="inline-flex items-center gap-1.5 bg-purple-50 text-purple-700 text-sm font-semibold px-3 py-1.5 rounded-full border border-purple-200 whitespace-nowrap">
-                  🎙️ 语音打卡
+                  <Mic size={16} strokeWidth={2.2} /> 语音打卡
                 </span>
               )}
               {hasVideo && (
                 <span className="inline-flex items-center gap-1.5 bg-pink-50 text-pink-700 text-sm font-semibold px-3 py-1.5 rounded-full border border-pink-200 whitespace-nowrap">
-                  🎬 视频打卡
+                  <Film size={16} strokeWidth={2.2} /> 视频打卡
                 </span>
               )}
             </div>

@@ -1,5 +1,6 @@
 import { useState, useContext, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { ChevronLeft, Pencil, Camera, Mic, Video, Check, Lightbulb, Package, Music } from 'lucide-react';
 import { AuthContext } from '../AuthContext';
 import { api } from '../api';
 
@@ -247,8 +248,8 @@ export default function CheckIn() {
     <div className="min-h-screen bg-gray-50">
       <div className="bg-white shadow">
         <div className="max-w-md mx-auto px-4 py-4 flex items-center">
-          <button onClick={() => navigate(-1)} className="text-gray-500">← 返回</button>
-          <h1 className="text-xl font-bold flex-1 text-center">✏️ 打卡</h1>
+          <button onClick={() => navigate(-1)} className="text-gray-500 inline-flex items-center gap-1"><ChevronLeft size={18} /> 返回</button>
+          <h1 className="text-xl font-bold flex-1 text-center inline-flex items-center justify-center gap-2"><Pencil size={20} /> 打卡</h1>
         </div>
       </div>
 
@@ -291,7 +292,7 @@ export default function CheckIn() {
                 ✕
               </button>
               <audio src={audio} controls className="w-full" />
-              <p className="text-xs text-gray-500 text-center mt-1">🎵 {Math.round(audio.length / 1024)}KB</p>
+              <p className="text-xs text-gray-500 text-center mt-1 inline-flex items-center justify-center gap-1 w-full"><Music size={12} /> {Math.round(audio.length / 1024)}KB</p>
             </div>
           )}
 
@@ -306,7 +307,7 @@ export default function CheckIn() {
                 ✕
               </button>
               <video src={video} controls className="rounded max-h-64 mx-auto" />
-              <p className="text-xs text-gray-500 text-center mt-1">🎥 {Math.round(video.length / 1024)}KB</p>
+              <p className="text-xs text-gray-500 text-center mt-1 inline-flex items-center justify-center gap-1 w-full"><Video size={12} /> {Math.round(video.length / 1024)}KB</p>
             </div>
           )}
 
@@ -315,7 +316,7 @@ export default function CheckIn() {
             <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-center">
               <div className="flex items-center justify-center gap-2 text-red-600 font-bold">
                 <span className="w-3 h-3 bg-red-500 rounded-full animate-pulse"></span>
-                {recordingType === 'audio' ? '🎤 录音' : '🎥 录视频'}中 {recordingTime}s / {recordingType === 'audio' ? AUDIO_MAX_SECONDS : VIDEO_MAX_SECONDS}s
+                {recordingType === 'audio' ? <><Mic size={16} /> 录音</> : <><Video size={16} /> 录视频</>}中 {recordingTime}s / {recordingType === 'audio' ? AUDIO_MAX_SECONDS : VIDEO_MAX_SECONDS}s
               </div>
               <button
                 type="button"
@@ -335,7 +336,7 @@ export default function CheckIn() {
                   ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
                   : 'bg-blue-50 hover:bg-blue-100 text-blue-700'
               }`}>
-                <span className="text-xl">📷</span>
+                <Camera size={24} />
                 <span className="text-xs mt-1">图片 {images.length}/{MAX_IMAGES}</span>
                 <input
                   type="file"
@@ -356,8 +357,8 @@ export default function CheckIn() {
                     : 'bg-green-50 hover:bg-green-100 text-green-700'
                 }`}
               >
-                <span className="text-xl">🎤</span>
-                <span className="text-xs mt-1">{audio ? '✅ 已录' : '录音(1分钟)'}</span>
+                <Mic size={24} />
+                <span className="text-xs mt-1 inline-flex items-center gap-1">{audio ? <><Check size={12} /> 已录</> : '录音(1分钟)'}</span>
               </button>
 
               <button
@@ -370,16 +371,16 @@ export default function CheckIn() {
                     : 'bg-red-50 hover:bg-red-100 text-red-700'
                 }`}
               >
-                <span className="text-xl">🎥</span>
-                <span className="text-xs mt-1">{video ? '✅ 已录' : '视频(10s)'}</span>
+                <Video size={24} />
+                <span className="text-xs mt-1 inline-flex items-center gap-1">{video ? <><Check size={12} /> 已录</> : '视频(10s)'}</span>
               </button>
             </div>
           )}
 
           {/* 提示规则 + 各项大小 */}
           <div className="text-xs text-gray-500 space-y-1">
-            <p>💡 图片（1-3 张）和视频二选一，录音可与图片同时存在</p>
-            <p>📦 每项媒体独立存储，单项上限 {Math.round(CELL_MAX_CHARS/1024)}KB</p>
+            <p className="inline-flex items-center gap-1.5"><Lightbulb size={12} /> 图片（1-3 张）和视频二选一，录音可与图片同时存在</p>
+            <p className="inline-flex items-center gap-1.5"><Package size={12} /> 每项媒体独立存储，单项上限 {Math.round(CELL_MAX_CHARS/1024)}KB</p>
             {totalSize > 0 && (
               <p>当前媒体合计：{Math.round(totalSize / 1024)}KB（{[images.length > 0 ? `${images.length}图` : null, audio ? '录音' : null, video ? '视频' : null].filter(Boolean).join(' + ')}）</p>
             )}
@@ -388,12 +389,12 @@ export default function CheckIn() {
           <button
             type="submit"
             disabled={loading || recording}
-            className="w-full bg-indigo-600 text-white px-4 py-3 rounded-lg font-medium hover:bg-indigo-700 disabled:opacity-50"
+            className="w-full bg-indigo-600 text-white px-4 py-3 rounded-lg font-medium hover:bg-indigo-700 disabled:opacity-50 inline-flex items-center justify-center gap-2"
           >
-            {loading ? '提交中...' : '✅ 提交打卡'}
+            {loading ? '提交中...' : (<><Check size={18} /> 提交打卡</>)}
           </button>
 
-          <p className="text-xs text-gray-500 text-center">💡 每人每天只能打卡一次</p>
+          <p className="text-xs text-gray-500 text-center inline-flex items-center justify-center gap-1.5 w-full"><Lightbulb size={12} /> 每人每天只能打卡一次</p>
         </form>
       </div>
     </div>

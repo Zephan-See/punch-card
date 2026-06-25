@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react';
 import * as htmlToImage from 'html-to-image';
+import { Heart, MessageCircle, Share2, ImageIcon } from 'lucide-react';
 import { api } from '../api';
 import Poster from './Poster';
 
@@ -209,38 +210,38 @@ export default function CheckinCard({ checkin, displayName, currentUserId, token
         <button
           onClick={handleLike}
           disabled={submitting}
-          className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-sm transition ${
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm transition ${
             checkin.is_liked ? 'bg-red-50 text-red-600' : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
           }`}
         >
-          <span>{checkin.is_liked ? '❤️' : '🤍'}</span>
+          <Heart size={16} fill={checkin.is_liked ? 'currentColor' : 'none'} strokeWidth={2} />
           <span className="font-medium">{checkin.like_count || 0}</span>
         </button>
 
         {allowComment && (
           <button
             onClick={toggleComments}
-            className="flex items-center gap-1 px-3 py-1.5 rounded-full text-sm bg-gray-50 text-gray-600 hover:bg-gray-100 transition"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm bg-gray-50 text-gray-600 hover:bg-gray-100 transition"
           >
-            <span>💬</span>
+            <MessageCircle size={16} strokeWidth={2} />
             <span className="font-medium">补充 {checkin.comment_count || 0}</span>
           </button>
         )}
 
         <button
           onClick={handleShare}
-          className="flex items-center gap-1 px-3 py-1.5 rounded-full text-sm bg-indigo-50 text-indigo-600 hover:bg-indigo-100 transition"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm bg-indigo-50 text-indigo-600 hover:bg-indigo-100 transition"
         >
-          <span>🔗</span>
+          <Share2 size={16} strokeWidth={2} />
           <span className="font-medium">分享</span>
         </button>
 
         <button
           onClick={handlePoster}
           disabled={posterLoading}
-          className="flex items-center gap-1 px-3 py-1.5 rounded-full text-sm bg-pink-50 text-pink-600 hover:bg-pink-100 transition disabled:opacity-60"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm bg-pink-50 text-pink-600 hover:bg-pink-100 transition disabled:opacity-60"
         >
-          <span>📸</span>
+          <ImageIcon size={16} strokeWidth={2} />
           <span className="font-medium">{posterLoading ? '…' : '海报'}</span>
         </button>
       </div>

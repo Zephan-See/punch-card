@@ -1,5 +1,6 @@
 import { useState, useEffect, useContext } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { ChevronLeft, Camera } from 'lucide-react';
 import { AuthContext } from '../AuthContext';
 import { api } from '../api';
 import CheckinCard from '../components/CheckinCard';
@@ -57,9 +58,10 @@ export default function Wall() {
     <div className="min-h-screen bg-gray-50">
       <div className="bg-white shadow sticky top-0 z-50">
         <div className="max-w-md mx-auto px-4 py-4 flex items-center justify-between">
-          <button onClick={() => navigate(-1)} className="text-gray-500">← 返回</button>
-          <h1 className="text-xl font-bold">
-            {viewingFriend ? `📸 ${userInfo?.name || ''}的打卡墙` : '📸 我的打卡墙'}
+          <button onClick={() => navigate(-1)} className="text-gray-500 inline-flex items-center gap-1"><ChevronLeft size={18} /> 返回</button>
+          <h1 className="text-xl font-bold inline-flex items-center gap-2">
+            <Camera size={20} />
+            {viewingFriend ? `${userInfo?.name || ''}的打卡墙` : '我的打卡墙'}
           </h1>
           <div></div>
         </div>

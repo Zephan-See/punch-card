@@ -1,5 +1,6 @@
 import { useState, useEffect, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { ChevronLeft, Shield, RotateCw, BarChart3, Users, ClipboardList, Pencil, CalendarDays, TrendingUp, Heart } from 'lucide-react';
 import { AuthContext } from '../../AuthContext';
 import { api } from '../../api';
 
@@ -74,9 +75,9 @@ export default function AdminDashboard() {
       {/* 顶部导航 - 手机适配 */}
       <div className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow sticky top-0 z-50">
         <div className="max-w-2xl mx-auto px-3 py-3 flex items-center justify-between">
-          <button onClick={() => navigate('/home')} className="text-white opacity-80 hover:opacity-100 text-sm">← 返回</button>
-          <h1 className="text-base sm:text-xl font-bold">🛡️ 管理员后台</h1>
-          <button onClick={loadAll} className="text-white opacity-80 hover:opacity-100 text-sm">🔄</button>
+          <button onClick={() => navigate('/home')} className="text-white opacity-80 hover:opacity-100 text-sm inline-flex items-center gap-1"><ChevronLeft size={16} /> 返回</button>
+          <h1 className="text-base sm:text-xl font-bold inline-flex items-center gap-2"><Shield size={18} /> 管理员后台</h1>
+          <button onClick={loadAll} className="text-white opacity-80 hover:opacity-100 text-sm" aria-label="刷新"><RotateCw size={16} /></button>
         </div>
       </div>
 
@@ -84,18 +85,18 @@ export default function AdminDashboard() {
       <div className="bg-white shadow-sm sticky top-12 z-40">
         <div className="max-w-2xl mx-auto px-2 flex">
           {[
-            { key: 'stats', label: '📊 统计' },
-            { key: 'users', label: '👥 用户' },
-            { key: 'checkins', label: '📝 打卡' }
+            { key: 'stats', label: '统计', Icon: BarChart3 },
+            { key: 'users', label: '用户', Icon: Users },
+            { key: 'checkins', label: '打卡', Icon: ClipboardList }
           ].map(t => (
             <button
               key={t.key}
               onClick={() => setTab(t.key)}
-              className={`flex-1 px-2 py-2.5 font-medium text-sm border-b-2 transition ${
+              className={`flex-1 px-2 py-2.5 font-medium text-sm border-b-2 transition inline-flex items-center justify-center gap-1.5 ${
                 tab === t.key ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500'
               }`}
             >
-              {t.label}
+              <t.Icon size={16} /> {t.label}
             </button>
           ))}
         </div>
@@ -128,7 +129,7 @@ export default function AdminDashboard() {
               ) : (
                 <div className="flex items-center justify-between">
                   <p className="font-bold text-lg">{activityName}</p>
-                  <button onClick={() => setEditingActivity(true)} className="text-indigo-600 text-sm">✏️ 编辑</button>
+                  <button onClick={() => setEditingActivity(true)} className="text-indigo-600 text-sm inline-flex items-center gap-1"><Pencil size={14} /> 编辑</button>
                 </div>
               )}
             </div>
@@ -156,12 +157,12 @@ export default function AdminDashboard() {
             {/* 今日 / 7天 */}
             <div className="grid grid-cols-2 gap-2 mb-3">
               <div className="bg-gradient-to-br from-orange-50 to-red-50 p-3 rounded-lg border border-orange-200">
-                <p className="text-xs text-orange-700">📅 今日打卡</p>
+                <p className="text-xs text-orange-700 inline-flex items-center gap-1"><CalendarDays size={12} /> 今日打卡</p>
                 <p className="text-3xl font-bold text-orange-600 mt-1">{stats.todayCheckins}</p>
                 <p className="text-xs text-orange-700 mt-1">人/次</p>
               </div>
               <div className="bg-gradient-to-br from-green-50 to-teal-50 p-3 rounded-lg border border-green-200">
-                <p className="text-xs text-green-700">📊 最近 7 天</p>
+                <p className="text-xs text-green-700 inline-flex items-center gap-1"><BarChart3 size={12} /> 最近 7 天</p>
                 <p className="text-3xl font-bold text-green-600 mt-1">{stats.recent7DaysCheckins}</p>
                 <p className="text-xs text-green-700 mt-1">次打卡</p>
               </div>
@@ -169,7 +170,7 @@ export default function AdminDashboard() {
 
             {/* 7 天趋势图 */}
             <div className="bg-white rounded-lg shadow-sm p-4">
-              <h3 className="font-bold mb-3 text-sm">📈 最近 7 天打卡趋势</h3>
+              <h3 className="font-bold mb-3 text-sm inline-flex items-center gap-1.5"><TrendingUp size={14} /> 最近 7 天打卡趋势</h3>
               <div className="flex items-end justify-between gap-1 h-32">
                 {stats.dailyTrend?.map((d, i) => {
                   const maxCount = Math.max(...stats.dailyTrend.map(x => x.count), 1);
@@ -198,7 +199,7 @@ export default function AdminDashboard() {
         ) : tab === 'users' ? (
           <div className="bg-white rounded-lg shadow-sm overflow-hidden">
             <div className="p-3 border-b bg-gray-50">
-              <h3 className="font-bold text-sm">👥 用户列表（{users.length}）</h3>
+              <h3 className="font-bold text-sm inline-flex items-center gap-1.5"><Users size={14} /> 用户列表（{users.length}）</h3>
             </div>
             {users.map(u => (
               <div key={u.id} className="p-3 border-b last:border-b-0 hover:bg-gray-50">
@@ -237,7 +238,7 @@ export default function AdminDashboard() {
         ) : tab === 'checkins' ? (
           <div className="bg-white rounded-lg shadow-sm overflow-hidden">
             <div className="p-3 border-b bg-gray-50">
-              <h3 className="font-bold text-sm">📝 所有打卡（{checkins.length}）</h3>
+              <h3 className="font-bold text-sm inline-flex items-center gap-1.5"><ClipboardList size={14} /> 所有打卡（{checkins.length}）</h3>
             </div>
             {checkins.map(c => (
               <div key={c.id} className="p-3 border-b last:border-b-0 hover:bg-gray-50">
@@ -261,7 +262,7 @@ export default function AdminDashboard() {
                   </button>
                 </div>
                 <p className="text-gray-700 ml-10 whitespace-pre-wrap text-sm">{c.content}</p>
-                <p className="text-xs text-gray-400 mt-1 ml-10">❤️ {c.like_count}</p>
+                <p className="text-xs text-gray-400 mt-1 ml-10 inline-flex items-center gap-1"><Heart size={11} fill="currentColor" /> {c.like_count}</p>
               </div>
             ))}
           </div>

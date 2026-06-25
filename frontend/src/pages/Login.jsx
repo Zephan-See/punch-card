@@ -1,5 +1,6 @@
 import { useState, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { CalendarDays } from 'lucide-react';
 import { AuthContext } from '../AuthContext';
 
 export default function Login() {
@@ -31,7 +32,7 @@ export default function Login() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-600 to-blue-600 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md">
-        <h1 className="text-3xl font-bold text-center mb-8 text-gray-800">📅 打卡小程序</h1>
+        <h1 className="text-3xl font-bold text-center mb-8 text-gray-800 inline-flex items-center justify-center gap-2 w-full"><CalendarDays size={28} /> 打卡小程序</h1>
 
         {error && (
           <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">

@@ -1,5 +1,6 @@
 import { useState, useEffect, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { ChevronLeft, Settings, Check, Lock } from 'lucide-react';
 import { AuthContext } from '../AuthContext';
 import { api } from '../api';
 import AvatarCropper from '../components/AvatarCropper';
@@ -156,8 +157,8 @@ export default function Profile() {
     <div className="min-h-screen bg-gray-50">
       <div className="bg-white shadow sticky top-0">
         <div className="max-w-md mx-auto px-4 py-4 flex items-center justify-between">
-          <button onClick={() => navigate(-1)} className="text-gray-500">← 返回</button>
-          <h1 className="text-xl font-bold">⚙️ 设置</h1>
+          <button onClick={() => navigate(-1)} className="text-gray-500 inline-flex items-center gap-1"><ChevronLeft size={18} /> 返回</button>
+          <h1 className="text-xl font-bold inline-flex items-center gap-2"><Settings size={20} /> 设置</h1>
           <div></div>
         </div>
       </div>
@@ -200,8 +201,8 @@ export default function Profile() {
               <div className={`absolute top-1 w-6 h-6 bg-white rounded-full transition-transform ${wallPublic ? 'translate-x-7' : 'translate-x-1'}`} />
             </button>
           </div>
-          <p className="text-xs text-gray-500 mt-4">
-            {wallPublic ? '✅ 打卡墙已公开，朋友可以在排行榜查看' : '🔒 打卡墙已私密，只有你能看到'}
+          <p className="text-xs text-gray-500 mt-4 inline-flex items-center gap-1.5">
+            {wallPublic ? <><Check size={12} /> 打卡墙已公开，朋友可以在排行榜查看</> : <><Lock size={12} /> 打卡墙已私密，只有你能看到</>}
           </p>
         </div>
 

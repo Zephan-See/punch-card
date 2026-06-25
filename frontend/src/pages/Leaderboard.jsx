@@ -1,7 +1,10 @@
 import { useState, useEffect, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { ChevronLeft, Trophy, Lightbulb, Medal } from 'lucide-react';
 import { AuthContext } from '../AuthContext';
 import { api } from '../api';
+
+const MEDAL_COLOR = ['#f5b342', '#a8a8a8', '#cd7f32'];
 
 export default function Leaderboard() {
   const [ranking, setRanking] = useState([]);
@@ -29,9 +32,7 @@ export default function Leaderboard() {
   };
 
   const getMedal = (idx) => {
-    if (idx === 0) return '🥇';
-    if (idx === 1) return '🥈';
-    if (idx === 2) return '🥉';
+    if (idx <= 2) return <Medal size={28} fill={MEDAL_COLOR[idx]} color={MEDAL_COLOR[idx]} strokeWidth={1.5} />;
     return idx + 1;
   };
 
@@ -39,8 +40,8 @@ export default function Leaderboard() {
     <div className="min-h-screen bg-gray-50">
       <div className="bg-white shadow sticky top-0 z-50">
         <div className="max-w-md mx-auto px-4 py-4 flex items-center justify-between">
-          <button onClick={() => navigate(-1)} className="text-gray-500">← 返回</button>
-          <h1 className="text-xl font-bold">🏆 排行榜</h1>
+          <button onClick={() => navigate(-1)} className="text-gray-500 inline-flex items-center gap-1"><ChevronLeft size={18} /> 返回</button>
+          <h1 className="text-xl font-bold inline-flex items-center gap-2"><Trophy size={22} /> 排行榜</h1>
           <div></div>
         </div>
       </div>
@@ -57,7 +58,7 @@ export default function Leaderboard() {
             {/* 前三名特殊样式 */}
             {ranking.slice(0, 3).length > 0 && (
               <div className="bg-gradient-to-br from-yellow-50 to-orange-50 rounded-xl p-4 mb-4 border border-yellow-200">
-                <p className="text-center font-semibold text-orange-700 mb-3">🌟 本期前三名</p>
+                <p className="text-center font-semibold text-orange-700 mb-3 inline-flex items-center justify-center gap-1.5 w-full"><Trophy size={16} /> 本期前三名</p>
                 <div className="space-y-2">
                   {ranking.slice(0, 3).map((usr, idx) => (
                     <button
@@ -128,8 +129,8 @@ export default function Leaderboard() {
               </div>
             )}
 
-            <p className="text-center text-xs text-gray-400 mt-4">
-              💡 点击任意用户查看 TA 的打卡墙
+            <p className="text-center text-xs text-gray-400 mt-4 inline-flex items-center justify-center gap-1.5 w-full">
+              <Lightbulb size={12} /> 点击任意用户查看 TA 的打卡墙
             </p>
           </>
         ) : (
