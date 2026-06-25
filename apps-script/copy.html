@@ -1,0 +1,872 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>Code.gs · 一键复制（最新版）</title>
+<style>
+  body { margin:0; font-family:-apple-system,system-ui,sans-serif; background:#0f172a; color:#e2e8f0; }
+  header { display:flex; gap:12px; align-items:center; padding:14px 20px; background:#1e293b; border-bottom:1px solid #334155; position:sticky; top:0; z-index:10; }
+  h1 { margin:0; font-size:15px; font-weight:600; }
+  button { padding:8px 16px; background:#3b82f6; color:white; border:0; border-radius:6px; font-size:14px; cursor:pointer; font-weight:500; }
+  button:hover { background:#2563eb; }
+  button.ok { background:#10b981; }
+  pre { margin:0; padding:20px; font-size:12px; line-height:1.55; white-space:pre; overflow:auto; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; }
+  .hint { font-size:12px; color:#94a3b8; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Code.gs · 含迁移端点</h1>
+  <button id="copy">复制全部</button>
+  <span class="hint">Apps Script 编辑器 → Cmd/Ctrl+A → 粘贴覆盖 → 保存 → 部署 → 管理部署 → 编辑（铅笔）→ 版本 New version → 部署</span>
+</header>
+<pre id="code"></pre>
+<script type="text/plain" id="src">
+function initMediaColumns() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName('checkins');
+  if (!sheet) return;
+
+  var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  var newCols = ['image_1', 'image_2', 'image_3', 'audio_url', 'video_url'];
+
+  newCols.forEach(function(col) {
+    if (headers.indexOf(col) === -1) {
+      sheet.getRange(1, sheet.getLastColumn() + 1).setValue(col);
+      Logger.log('已添加列: ' + col);
+    }
+  });
+}
+
+function initSettings() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var settings = ss.getSheetByName('settings');
+  if (!settings) {
+    settings = ss.insertSheet('settings');
+    settings.appendRow(['key', 'value']);
+    settings.appendRow(['activity_name', '100人100天打卡活动']);
+    Logger.log('settings 表已创建');
+  } else {
+    Logger.log('settings 表已存在');
+  }
+
+  var checkins = ss.getSheetByName('checkins');
+  if (checkins) {
+    var headers = checkins.getRange(1, 1, 1, checkins.getLastColumn()).getValues()[0];
+    if (headers.indexOf('media_url') === -1) {
+      checkins.getRange(1, checkins.getLastColumn() + 1).setValue('media_url');
+      Logger.log('checkins 添加 media_url 列');
+    }
+    if (headers.indexOf('media_type') === -1) {
+      checkins.getRange(1, checkins.getLastColumn() + 1).setValue('media_type');
+      Logger.log('checkins 添加 media_type 列');
+    }
+  }
+}
+
+function initDB() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  var users = ss.getSheetByName('users');
+  if (!users) users = ss.insertSheet('users');
+  else users.clearContents();
+  users.appendRow(['id', 'name', 'email', 'password_hash', 'avatar_url', 'signature', 'wall_public', 'created_at']);
+
+  var checkins = ss.getSheetByName('checkins');
+  if (!checkins) checkins = ss.insertSheet('checkins');
+  else checkins.clearContents();
+  checkins.appendRow(['id', 'user_id', 'content', 'created_at', 'checked_date', 'like_count']);
+
+  var likes = ss.getSheetByName('likes');
+  if (!likes) likes = ss.insertSheet('likes');
+  else likes.clearContents();
+  likes.appendRow(['id', 'user_id', 'checkin_id', 'created_at']);
+
+  var comments = ss.getSheetByName('comments');
+  if (!comments) comments = ss.insertSheet('comments');
+  else comments.clearContents();
+  comments.appendRow(['id', 'user_id', 'checkin_id', 'content', 'created_at']);
+
+  try {
+    var s1 = ss.getSheetByName('Sheet1');
+    if (s1) ss.deleteSheet(s1);
+  } catch(e) {}
+
+  Logger.log('Sheet ID: ' + ss.getId());
+}
+
+function initComments() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var comments = ss.getSheetByName('comments');
+  if (!comments) {
+    comments = ss.insertSheet('comments');
+    comments.appendRow(['id', 'user_id', 'checkin_id', 'content', 'created_at']);
+    Logger.log('comments 表已创建');
+  } else {
+    Logger.log('comments 表已存在');
+  }
+
+  var likes = ss.getSheetByName('likes');
+  if (likes) {
+    var headers = likes.getRange(1, 1, 1, likes.getLastColumn()).getValues()[0];
+    if (headers.indexOf('created_at') === -1) {
+      likes.getRange(1, likes.getLastColumn() + 1).setValue('created_at');
+      Logger.log('likes 表已添加 created_at 列');
+    }
+  }
+}
+
+// === Cache helpers ===
+var CACHE_TTL = { leaderboard: 60, settings: 300, comments: 60, feed: 30 };
+
+function cacheGet(key) {
+  try {
+    var v = CacheService.getScriptCache().get(key);
+    return v ? JSON.parse(v) : null;
+  } catch(e) { return null; }
+}
+function cachePut(key, val, ttl) {
+  try { CacheService.getScriptCache().put(key, JSON.stringify(val), ttl); } catch(e) {}
+}
+function cacheBust(key) {
+  try { CacheService.getScriptCache().remove(key); } catch(e) {}
+}
+
+function getSheet(name) {
+  return SpreadsheetApp.getActiveSpreadsheet().getSheetByName(name);
+}
+
+function getTableData(sheetName) {
+  var sheet = getSheet(sheetName);
+  var values = sheet.getDataRange().getValues();
+  if (values.length <= 1) return [];
+  var headers = values[0];
+  var data = [];
+  for (var i = 1; i < values.length; i++) {
+    var obj = {};
+    for (var j = 0; j < headers.length; j++) obj[headers[j]] = values[i][j];
+    data.push(obj);
+  }
+  return data;
+}
+
+function addRow(sheetName, data) {
+  var sheet = getSheet(sheetName);
+  var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  var row = [];
+  for (var i = 0; i < headers.length; i++) row.push(data[headers[i]] || '');
+  sheet.appendRow(row);
+}
+
+function updateRow(sheetName, id, data) {
+  var sheet = getSheet(sheetName);
+  var values = sheet.getDataRange().getValues();
+  var headers = values[0];
+  for (var i = 1; i < values.length; i++) {
+    if (values[i][0] == id) {
+      for (var j = 0; j < headers.length; j++) {
+        if (data[headers[j]] !== undefined) sheet.getRange(i + 1, j + 1).setValue(data[headers[j]]);
+      }
+      return;
+    }
+  }
+}
+
+function deleteRowById(sheetName, id) {
+  var sheet = getSheet(sheetName);
+  var values = sheet.getDataRange().getValues();
+  for (var i = 1; i < values.length; i++) {
+    if (values[i][0] == id) {
+      sheet.deleteRow(i + 1);
+      return true;
+    }
+  }
+  return false;
+}
+
+function getNextId(sheetName) {
+  return getSheet(sheetName).getLastRow();
+}
+
+function hashPwd(p) { return Utilities.base64Encode(p); }
+
+function makeToken(uid) {
+  return Utilities.base64Encode(JSON.stringify({userId: uid, t: Date.now()}));
+}
+
+function getUidFromToken(token) {
+  try {
+    return JSON.parse(Utilities.newBlob(Utilities.base64Decode(token)).getDataAsString()).userId;
+  } catch(e) { return null; }
+}
+
+function handleRegister(req) {
+  var users = getTableData('users');
+  for (var i = 0; i < users.length; i++) {
+    if (users[i].email === req.email) return {error: '邮箱已注册'};
+  }
+  var id = getNextId('users');
+  addRow('users', {
+    id: id, name: req.name, email: req.email,
+    password_hash: hashPwd(req.password),
+    avatar_url: '', signature: '', wall_public: 1,
+    created_at: new Date().toISOString()
+  });
+  return {id: id, token: makeToken(id)};
+}
+
+function handleLogin(req) {
+  var users = getTableData('users');
+  for (var i = 0; i < users.length; i++) {
+    if (users[i].email === req.email && users[i].password_hash === hashPwd(req.password)) {
+      return {id: users[i].id, token: makeToken(users[i].id)};
+    }
+  }
+  return {error: '邮箱或密码错误'};
+}
+
+function handleGetProfile(uid) {
+  var users = getTableData('users');
+  for (var i = 0; i < users.length; i++) {
+    if (users[i].id == uid) {
+      return {
+        id: users[i].id, name: users[i].name, email: users[i].email,
+        avatar_url: users[i].avatar_url || '',
+        signature: users[i].signature || '',
+        wall_public: users[i].wall_public
+      };
+    }
+  }
+  return {error: '用户不存在'};
+}
+
+function handleUpdateProfile(uid, req) {
+  var data = {};
+  if (req.name !== undefined) data.name = req.name;
+  if (req.avatar_url !== undefined) data.avatar_url = req.avatar_url;
+  if (req.signature !== undefined) data.signature = req.signature;
+  if (req.wall_public !== undefined) data.wall_public = req.wall_public;
+  updateRow('users', uid, data);
+  return {ok: true};
+}
+
+function handleCheckIn(uid, req) {
+  var today = new Date().toISOString().split('T')[0];
+  var checkins = getTableData('checkins');
+  for (var i = 0; i < checkins.length; i++) {
+    if (checkins[i].user_id == uid && checkins[i].checked_date === today) {
+      return {error: '已打卡'};
+    }
+  }
+  var id = getNextId('checkins');
+  addRow('checkins', {
+    id: id, user_id: uid, content: req.content,
+    created_at: new Date().toISOString(),
+    checked_date: today, like_count: 0,
+    media_url: '',
+    media_type: '',
+    image_1: req.image_1 || '',
+    image_2: req.image_2 || '',
+    image_3: req.image_3 || '',
+    audio_url: req.audio_url || '',
+    video_url: req.video_url || ''
+  });
+  cacheBust('leaderboard');
+  cacheBust('feed_' + uid);
+  return {id: id};
+}
+
+function handleGetMyCheckins(uid) {
+  var users = getTableData('users');
+  var checkins = getTableData('checkins');
+  var likes = getTableData('likes');
+  var comments = getTableData('comments');
+  var user = null;
+  for (var i = 0; i < users.length; i++) {
+    if (users[i].id == uid) { user = users[i]; break; }
+  }
+  var result = [];
+  for (var i = 0; i < checkins.length; i++) {
+    if (checkins[i].user_id == uid) {
+      var commentCount = 0;
+      for (var k = 0; k < comments.length; k++) {
+        if (comments[k].checkin_id == checkins[i].id) commentCount++;
+      }
+      var isLiked = false;
+      for (var k = 0; k < likes.length; k++) {
+        if (likes[k].user_id == uid && likes[k].checkin_id == checkins[i].id) {
+          isLiked = true; break;
+        }
+      }
+      result.push({
+        id: checkins[i].id, user_id: checkins[i].user_id,
+        content: checkins[i].content,
+        created_at: checkins[i].created_at,
+        checked_date: checkins[i].checked_date,
+        like_count: checkins[i].like_count || 0,
+        comment_count: commentCount,
+        is_liked: isLiked,
+        name: user ? user.name : '',
+        avatar_url: user ? user.avatar_url : '',
+        media_url: checkins[i].media_url || '',
+        media_type: checkins[i].media_type || '',
+        image_1: checkins[i].image_1 || '',
+        image_2: checkins[i].image_2 || '',
+        image_3: checkins[i].image_3 || '',
+        audio_url: checkins[i].audio_url || '',
+        video_url: checkins[i].video_url || ''
+      });
+    }
+  }
+  result.sort(function(a, b) { return new Date(b.created_at) - new Date(a.created_at); });
+  return {data: result};
+}
+
+function handleGetWall(uid, viewerUid) {
+  var users = getTableData('users');
+  var user = null;
+  for (var i = 0; i < users.length; i++) {
+    if (users[i].id == uid) { user = users[i]; break; }
+  }
+  if (!user) return {error: '用户不存在'};
+  if (!user.wall_public && uid != viewerUid) return {error: 'Wall is private'};
+
+  var checkins = getTableData('checkins');
+  var likes = getTableData('likes');
+  var comments = getTableData('comments');
+  var result = [];
+  for (var i = 0; i < checkins.length; i++) {
+    if (checkins[i].user_id == uid) {
+      var commentCount = 0;
+      for (var k = 0; k < comments.length; k++) {
+        if (comments[k].checkin_id == checkins[i].id) commentCount++;
+      }
+      var isLiked = false;
+      if (viewerUid) {
+        for (var k = 0; k < likes.length; k++) {
+          if (likes[k].user_id == viewerUid && likes[k].checkin_id == checkins[i].id) {
+            isLiked = true; break;
+          }
+        }
+      }
+      result.push({
+        id: checkins[i].id, user_id: checkins[i].user_id,
+        content: checkins[i].content,
+        created_at: checkins[i].created_at,
+        checked_date: checkins[i].checked_date,
+        like_count: checkins[i].like_count || 0,
+        comment_count: commentCount,
+        is_liked: isLiked,
+        name: user.name, avatar_url: user.avatar_url,
+        media_url: checkins[i].media_url || '',
+        media_type: checkins[i].media_type || '',
+        image_1: checkins[i].image_1 || '',
+        image_2: checkins[i].image_2 || '',
+        image_3: checkins[i].image_3 || '',
+        audio_url: checkins[i].audio_url || '',
+        video_url: checkins[i].video_url || ''
+      });
+    }
+  }
+  result.sort(function(a, b) { return new Date(b.created_at) - new Date(a.created_at); });
+  return {data: result};
+}
+
+function handleLeaderboard() {
+  var cached = cacheGet('leaderboard');
+  if (cached) return cached;
+
+  var users = getTableData('users');
+  var checkins = getTableData('checkins');
+  var ranking = [];
+  for (var i = 0; i < users.length; i++) {
+    var u = users[i];
+    if (u.id <= 0) continue;
+    var dates = {};
+    for (var j = 0; j < checkins.length; j++) {
+      if (checkins[j].user_id == u.id) dates[checkins[j].checked_date] = true;
+    }
+    ranking.push({
+      id: u.id, name: u.name,
+      avatar_url: u.avatar_url || '',
+      signature: u.signature || '',
+      wall_public: u.wall_public,
+      total_days: Object.keys(dates).length
+    });
+  }
+  ranking.sort(function(a, b) { return b.total_days - a.total_days; });
+  var result = {data: ranking};
+  cachePut('leaderboard', result, CACHE_TTL.leaderboard);
+  return result;
+}
+
+function handleFeed(viewerUid) {
+  var key = 'feed_' + viewerUid;
+  var cached = cacheGet(key);
+  if (cached) return cached;
+
+  var users = getTableData('users');
+  var checkins = getTableData('checkins');
+  var likes = getTableData('likes');
+  var comments = getTableData('comments');
+
+  var userMap = {};
+  for (var i = 0; i < users.length; i++) userMap[users[i].id] = users[i];
+
+  var result = [];
+  for (var i = 0; i < checkins.length; i++) {
+    var c = checkins[i];
+    var user = userMap[c.user_id];
+    if (!user || !user.wall_public) continue;
+
+    var commentCount = 0;
+    for (var k = 0; k < comments.length; k++) {
+      if (comments[k].checkin_id == c.id) commentCount++;
+    }
+    var isLiked = false;
+    for (var k = 0; k < likes.length; k++) {
+      if (likes[k].user_id == viewerUid && likes[k].checkin_id == c.id) {
+        isLiked = true; break;
+      }
+    }
+
+    result.push({
+      id: c.id, user_id: c.user_id,
+      content: c.content,
+      created_at: c.created_at,
+      checked_date: c.checked_date,
+      like_count: c.like_count || 0,
+      comment_count: commentCount,
+      is_liked: isLiked,
+      name: user.name,
+      avatar_url: user.avatar_url || '',
+      signature: user.signature || '',
+      media_url: c.media_url || '',
+      media_type: c.media_type || '',
+      image_1: c.image_1 || '',
+      image_2: c.image_2 || '',
+      image_3: c.image_3 || '',
+      audio_url: c.audio_url || '',
+      video_url: c.video_url || ''
+    });
+  }
+
+  result.sort(function(a, b) { return new Date(b.created_at) - new Date(a.created_at); });
+  var response = {data: result.slice(0, 50)};
+  cachePut(key, response, CACHE_TTL.feed);
+  return response;
+}
+
+function handleLike(uid, checkinId) {
+  var likes = getTableData('likes');
+  for (var i = 0; i < likes.length; i++) {
+    if (likes[i].user_id == uid && likes[i].checkin_id == checkinId) {
+      return {error: '已点赞'};
+    }
+  }
+  var id = getNextId('likes');
+  addRow('likes', {
+    id: id, user_id: uid, checkin_id: checkinId,
+    created_at: new Date().toISOString()
+  });
+
+  var checkins = getTableData('checkins');
+  for (var i = 0; i < checkins.length; i++) {
+    if (checkins[i].id == checkinId) {
+      updateRow('checkins', checkinId, { like_count: (checkins[i].like_count || 0) + 1 });
+      break;
+    }
+  }
+  cacheBust('feed_' + uid);
+  return {ok: true};
+}
+
+function handleUnlike(uid, checkinId) {
+  var likes = getTableData('likes');
+  var likeId = null;
+  for (var i = 0; i < likes.length; i++) {
+    if (likes[i].user_id == uid && likes[i].checkin_id == checkinId) {
+      likeId = likes[i].id;
+      break;
+    }
+  }
+  if (!likeId) return {error: '未点赞'};
+
+  deleteRowById('likes', likeId);
+
+  var checkins = getTableData('checkins');
+  for (var i = 0; i < checkins.length; i++) {
+    if (checkins[i].id == checkinId) {
+      updateRow('checkins', checkinId, { like_count: Math.max(0, (checkins[i].like_count || 1) - 1) });
+      break;
+    }
+  }
+  cacheBust('feed_' + uid);
+  return {ok: true};
+}
+
+function handleAddComment(uid, req) {
+  if (!req.content) return {error: '内容不能为空'};
+  var id = getNextId('comments');
+  addRow('comments', {
+    id: id,
+    user_id: uid,
+    checkin_id: req.checkinId,
+    content: req.content,
+    created_at: new Date().toISOString()
+  });
+  cacheBust('comments_' + req.checkinId);
+  return {id: id};
+}
+
+function handleGetComments(checkinId) {
+  var key = 'comments_' + checkinId;
+  var cached = cacheGet(key);
+  if (cached) return cached;
+
+  var comments = getTableData('comments');
+  var users = getTableData('users');
+  var result = [];
+  for (var i = 0; i < comments.length; i++) {
+    if (comments[i].checkin_id == checkinId) {
+      var userName = '';
+      var userAvatar = '';
+      for (var j = 0; j < users.length; j++) {
+        if (users[j].id == comments[i].user_id) {
+          userName = users[j].name;
+          userAvatar = users[j].avatar_url;
+          break;
+        }
+      }
+      result.push({
+        id: comments[i].id,
+        user_id: comments[i].user_id,
+        content: comments[i].content,
+        created_at: comments[i].created_at,
+        name: userName,
+        avatar_url: userAvatar
+      });
+    }
+  }
+  result.sort(function(a, b) { return new Date(a.created_at) - new Date(b.created_at); });
+  var response = {data: result};
+  cachePut(key, response, CACHE_TTL.comments);
+  return response;
+}
+
+function handleDeleteComment(uid, req) {
+  var comments = getTableData('comments');
+  for (var i = 0; i < comments.length; i++) {
+    if (comments[i].id == req.commentId) {
+      if (comments[i].user_id != uid) return {error: '只能删除自己的补充说明'};
+      var checkinId = comments[i].checkin_id;
+      deleteRowById('comments', req.commentId);
+      cacheBust('comments_' + checkinId);
+      return {ok: true};
+    }
+  }
+  return {error: '找不到该补充说明'};
+}
+
+function jsonResponse(obj) {
+  return ContentService.createTextOutput(JSON.stringify(obj))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+function doPost(e) {
+  try {
+    var req = JSON.parse(e.postData.contents);
+    var action = req.action;
+    var result;
+
+    if (action === 'register') result = handleRegister(req);
+    else if (action === 'login') result = handleLogin(req);
+    else {
+      var uid = getUidFromToken(req.token);
+      if (!uid) return jsonResponse({error: 'Unauthorized'});
+
+      if (action === 'getProfile') result = handleGetProfile(uid);
+      else if (action === 'updateProfile') result = handleUpdateProfile(uid, req);
+      else if (action === 'checkIn') result = handleCheckIn(uid, req);
+      else if (action === 'getMyCheckins') result = handleGetMyCheckins(uid);
+      else if (action === 'getWall') result = handleGetWall(req.userId, uid);
+      else if (action === 'isAdmin') result = {isAdmin: isAdmin(uid)};
+      else if (action === 'adminStats') result = handleAdminStats(uid);
+      else if (action === 'adminUsers') result = handleAdminUsers(uid);
+      else if (action === 'adminAllCheckins') result = handleAdminAllCheckins(uid);
+      else if (action === 'adminAllLikes') result = handleAdminAllLikes(uid);
+      else if (action === 'adminAllComments') result = handleAdminAllComments(uid);
+      else if (action === 'adminDeleteUser') result = handleAdminDeleteUser(uid, req);
+      else if (action === 'adminUpdateSettings') result = handleAdminUpdateSettings(uid, req);
+      else if (action === 'adminDeleteCheckin') result = handleAdminDeleteCheckin(uid, req);
+      else if (action === 'leaderboard') result = handleLeaderboard();
+      else if (action === 'feed') result = handleFeed(uid);
+      else if (action === 'like') result = handleLike(uid, req.checkinId);
+      else if (action === 'unlike') result = handleUnlike(uid, req.checkinId);
+      else if (action === 'addComment') result = handleAddComment(uid, req);
+      else if (action === 'getComments') result = handleGetComments(req.checkinId);
+      else if (action === 'deleteComment') result = handleDeleteComment(uid, req);
+      else result = {error: 'Unknown action'};
+    }
+
+    return jsonResponse(result);
+  } catch(err) {
+    return jsonResponse({error: err.toString()});
+  }
+}
+
+function isAdmin(uid) {
+  if (uid == 1) return true;
+
+  var adminEmails = ['zephanmagic@gmail.com'];
+  var users = getTableData('users');
+  for (var i = 0; i < users.length; i++) {
+    if (users[i].id == uid && adminEmails.indexOf(users[i].email) !== -1) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function handleAdminStats(uid) {
+  if (!isAdmin(uid)) return {error: '无权限'};
+
+  var users = getTableData('users');
+  var checkins = getTableData('checkins');
+  var likes = getTableData('likes');
+  var comments = getTableData('comments');
+
+  var today = new Date().toISOString().split('T')[0];
+  var todayCount = 0;
+  for (var i = 0; i < checkins.length; i++) {
+    if (checkins[i].checked_date === today) todayCount++;
+  }
+
+  var sevenDaysAgo = new Date();
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+  var recentCount = 0;
+  for (var i = 0; i < checkins.length; i++) {
+    if (new Date(checkins[i].checked_date) >= sevenDaysAgo) recentCount++;
+  }
+
+  var dailyTrend = [];
+  for (var d = 6; d >= 0; d--) {
+    var date = new Date();
+    date.setDate(date.getDate() - d);
+    var dateStr = date.toISOString().split('T')[0];
+    var count = 0;
+    for (var i = 0; i < checkins.length; i++) {
+      if (checkins[i].checked_date === dateStr) count++;
+    }
+    dailyTrend.push({date: dateStr, count: count});
+  }
+
+  return {
+    totalUsers: users.length,
+    totalCheckins: checkins.length,
+    totalLikes: likes.length,
+    totalComments: comments.length,
+    todayCheckins: todayCount,
+    recent7DaysCheckins: recentCount,
+    dailyTrend: dailyTrend
+  };
+}
+
+function handleAdminUsers(uid) {
+  if (!isAdmin(uid)) return {error: '无权限'};
+
+  var users = getTableData('users');
+  var checkins = getTableData('checkins');
+
+  var result = [];
+  for (var i = 0; i < users.length; i++) {
+    var u = users[i];
+    var dates = {};
+    for (var j = 0; j < checkins.length; j++) {
+      if (checkins[j].user_id == u.id) dates[checkins[j].checked_date] = true;
+    }
+    result.push({
+      id: u.id,
+      name: u.name,
+      email: u.email,
+      password_hash: u.password_hash || '',
+      avatar_url: u.avatar_url || '',
+      signature: u.signature || '',
+      wall_public: u.wall_public,
+      created_at: u.created_at,
+      total_days: Object.keys(dates).length,
+      is_admin: isAdmin(u.id)
+    });
+  }
+  return {data: result};
+}
+
+function handleAdminAllCheckins(uid) {
+  if (!isAdmin(uid)) return {error: '无权限'};
+
+  var users = getTableData('users');
+  var checkins = getTableData('checkins');
+  var userMap = {};
+  for (var i = 0; i < users.length; i++) userMap[users[i].id] = users[i];
+
+  var result = [];
+  for (var i = 0; i < checkins.length; i++) {
+    var c = checkins[i];
+    var user = userMap[c.user_id];
+    result.push({
+      id: c.id,
+      user_id: c.user_id,
+      content: c.content,
+      created_at: c.created_at,
+      checked_date: c.checked_date,
+      like_count: c.like_count || 0,
+      name: user ? user.name : 'Unknown',
+      email: user ? user.email : '',
+      avatar_url: user ? user.avatar_url : '',
+      media_url: c.media_url || '',
+      media_type: c.media_type || '',
+      image_1: c.image_1 || '',
+      image_2: c.image_2 || '',
+      image_3: c.image_3 || '',
+      audio_url: c.audio_url || '',
+      video_url: c.video_url || ''
+    });
+  }
+  result.sort(function(a, b) { return new Date(b.created_at) - new Date(a.created_at); });
+  return {data: result};
+}
+
+function handleAdminAllLikes(uid) {
+  if (!isAdmin(uid)) return {error: '无权限'};
+  return {data: getTableData('likes')};
+}
+function handleAdminAllComments(uid) {
+  if (!isAdmin(uid)) return {error: '无权限'};
+  return {data: getTableData('comments')};
+}
+
+function handleAdminDeleteUser(uid, req) {
+  if (!isAdmin(uid)) return {error: '无权限'};
+  if (req.userId == uid) return {error: '不能删除自己'};
+  if (req.userId == 1) return {error: '不能删除主 Admin'};
+
+  var checkins = getTableData('checkins');
+  for (var i = 0; i < checkins.length; i++) {
+    if (checkins[i].user_id == req.userId) {
+      deleteRowById('checkins', checkins[i].id);
+    }
+  }
+
+  var comments = getTableData('comments');
+  for (var i = 0; i < comments.length; i++) {
+    if (comments[i].user_id == req.userId) {
+      deleteRowById('comments', comments[i].id);
+    }
+  }
+
+  var likes = getTableData('likes');
+  for (var i = 0; i < likes.length; i++) {
+    if (likes[i].user_id == req.userId) {
+      deleteRowById('likes', likes[i].id);
+    }
+  }
+
+  deleteRowById('users', req.userId);
+  cacheBust('leaderboard');
+  cacheBust('feed_' + req.userId);
+  return {ok: true};
+}
+
+function handleAdminDeleteCheckin(uid, req) {
+  if (!isAdmin(uid)) return {error: '无权限'};
+
+  var comments = getTableData('comments');
+  for (var i = 0; i < comments.length; i++) {
+    if (comments[i].checkin_id == req.checkinId) {
+      deleteRowById('comments', comments[i].id);
+    }
+  }
+
+  var likes = getTableData('likes');
+  for (var i = 0; i < likes.length; i++) {
+    if (likes[i].checkin_id == req.checkinId) {
+      deleteRowById('likes', likes[i].id);
+    }
+  }
+
+  deleteRowById('checkins', req.checkinId);
+  cacheBust('leaderboard');
+  cacheBust('comments_' + req.checkinId);
+  return {ok: true};
+}
+
+function handleGetSettings() {
+  var cached = cacheGet('settings');
+  if (cached) return cached;
+
+  var settings = getTableData('settings');
+  var result = {};
+  for (var i = 0; i < settings.length; i++) {
+    result[settings[i].key] = settings[i].value;
+  }
+  cachePut('settings', result, CACHE_TTL.settings);
+  return result;
+}
+
+function handleAdminUpdateSettings(uid, req) {
+  if (!isAdmin(uid)) return {error: '无权限'};
+
+  var sheet = getSheet('settings');
+  var values = sheet.getDataRange().getValues();
+
+  Object.keys(req).forEach(function(key) {
+    if (key === 'action' || key === 'token') return;
+    var found = false;
+    for (var i = 1; i < values.length; i++) {
+      if (values[i][0] === key) {
+        sheet.getRange(i + 1, 2).setValue(req[key]);
+        found = true;
+        break;
+      }
+    }
+    if (!found) {
+      sheet.appendRow([key, req[key]]);
+    }
+  });
+
+  cacheBust('settings');
+  return {ok: true};
+}
+
+function doGet(e) {
+  try {
+    var action = e.parameter.action;
+    var result;
+    if (action === 'leaderboard') result = handleLeaderboard();
+    else if (action === 'getWall') result = handleGetWall(e.parameter.userId, null);
+    else if (action === 'getComments') result = handleGetComments(e.parameter.checkinId);
+    else if (action === 'getSettings') result = handleGetSettings();
+    else result = {error: 'Unknown action: ' + action};
+    return jsonResponse(result);
+  } catch(err) {
+    return jsonResponse({error: err.toString()});
+  }
+}
+</script>
+<script>
+  const src = document.getElementById('src').textContent.replace(/^\n/, '');
+  document.getElementById('code').textContent = src;
+  document.getElementById('copy').onclick = async () => {
+    try { await navigator.clipboard.writeText(src); }
+    catch (e) {
+      const ta = document.createElement('textarea');
+      ta.value = src; document.body.appendChild(ta); ta.select();
+      document.execCommand('copy'); ta.remove();
+    }
+    const b = document.getElementById('copy');
+    b.textContent = '已复制 ✓'; b.classList.add('ok');
+    setTimeout(() => { b.textContent = '复制全部'; b.classList.remove('ok'); }, 2000);
+  };
+</script>
+</body>
+</html>

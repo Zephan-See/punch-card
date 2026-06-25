@@ -26,9 +26,17 @@ export default function CheckinCard({ checkin, displayName, currentUserId, token
   const [posterCheckin, setPosterCheckin] = useState(null);
   const posterRef = useRef(null);
 
-  // Convert a URL to base64 via <img> + canvas. More reliable on iOS Safari
-  // than fetch+FileReader, and uses the browser's normal image pipeline.
-  // crossOrigin='anonymous' lets us read pixels without tainting the canvas.
+  const { date, time } = formatDateTime(checkin.created_at);
+  const isOwn = checkin.user_id == currentUserId;
+
+  // ponytail: iOS Safari caches the wall's <img> WITHOUT crossOrigin; canvas
+  // then hits that tainted cache and toDataURL throws. Append a query param
+  // so it's a "new" URL → fresh request with proper CORS headers from Supabase.
+  const corsUrl = (url) => {
+    if (!url || url.startsWith('data:')) return url;
+    return url + (url.includes('?') ? '&' : '?') + 'c=1';
+  };
+
   const toDataUrl = (url) => new Promise((resolve) => {
     if (!url) return resolve('');
     if (url.startsWith('data:')) return resolve(url);
@@ -50,12 +58,11 @@ export default function CheckinCard({ checkin, displayName, currentUserId, token
     };
     img.onerror = () => { console.warn('preload failed', url); finish(url); };
     setTimeout(() => finish(url), 8000);
-    img.src = url;
+    img.src = corsUrl(url);
   });
 
-  // Pre-warm the browser image cache as soon as the card mounts (own checkins
-  // only — only they get a 海报 button). By the time the user taps 海报 the
-  // image is already cached and the canvas extract is instant.
+  // Pre-warm the cache with the CORS-tagged URL so the eventual canvas read
+  // hits a clean cache entry, not the wall's non-CORS one.
   useEffect(() => {
     if (!isOwn) return;
     const urls = [
@@ -66,12 +73,9 @@ export default function CheckinCard({ checkin, displayName, currentUserId, token
     urls.forEach(url => {
       const i = new Image();
       i.crossOrigin = 'anonymous';
-      i.src = url;
+      i.src = corsUrl(url);
     });
   }, [checkin.id, isOwn]);
-
-  const { date, time } = formatDateTime(checkin.created_at);
-  const isOwn = checkin.user_id == currentUserId;
 
   const loadComments = async () => {
     setLoadingComments(true);
