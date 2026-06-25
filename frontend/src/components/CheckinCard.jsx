@@ -129,14 +129,26 @@ export default function CheckinCard({ checkin, displayName, currentUserId, token
     if (posterLoading) return;
     setPosterLoading(true);
     try {
-      // Mount Poster off-screen if not already; wait for it to paint
       if (!posterMounted) setPosterMounted(true);
-      // Two RAFs to ensure layout + paint, plus a tick for fonts/images
+      // Two RAFs so React commits + browser paints the poster
       await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
-      await new Promise(r => setTimeout(r, 100));
       if (!posterRef.current) throw new Error('海报组件未就绪');
+
+      // Wait for every <img> in the poster to finish loading; otherwise
+      // html-to-image captures empty placeholders on first click.
+      const imgs = Array.from(posterRef.current.querySelectorAll('img'));
+      await Promise.all(imgs.map(img => {
+        if (img.complete && img.naturalWidth > 0) return Promise.resolve();
+        return new Promise(resolve => {
+          img.addEventListener('load', resolve, { once: true });
+          img.addEventListener('error', resolve, { once: true });
+        });
+      }));
+
       const { toPng } = await import('html-to-image');
-      const dataUrl = await toPng(posterRef.current, { pixelRatio: 2, cacheBust: true });
+      // cacheBust would re-fetch every image with a ?v= query, racing again.
+      // Leave it off so html-to-image reuses the now-loaded <img> elements.
+      const dataUrl = await toPng(posterRef.current, { pixelRatio: 2 });
       setPosterUrl(dataUrl);
     } catch (e) {
       alert('生成海报失败：' + e.message);
