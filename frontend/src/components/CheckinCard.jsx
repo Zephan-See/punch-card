@@ -1,4 +1,4 @@
-import { useState, useRef, lazy, Suspense } from 'react';
+import { useState, useRef, lazy, Suspense, useEffect } from 'react';
 import { Heart, MessageCircle, Share2, ImageIcon, Send, Download } from 'lucide-react';
 import { api } from '../api';
 
@@ -26,23 +26,49 @@ export default function CheckinCard({ checkin, displayName, currentUserId, token
   const [posterCheckin, setPosterCheckin] = useState(null);
   const posterRef = useRef(null);
 
-  // Fetch a URL and convert to base64 data URL. Falls back to original URL
-  // on failure so the poster never just disappears the image entirely.
-  const toDataUrl = async (url) => {
-    if (!url || url.startsWith('data:')) return url || '';
-    try {
-      const blob = await fetch(url, { mode: 'cors' }).then(r => r.blob());
-      return await new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result);
-        reader.onerror = reject;
-        reader.readAsDataURL(blob);
-      });
-    } catch (e) {
-      console.warn('preload failed', url, e);
-      return url;
-    }
-  };
+  // Convert a URL to base64 via <img> + canvas. More reliable on iOS Safari
+  // than fetch+FileReader, and uses the browser's normal image pipeline.
+  // crossOrigin='anonymous' lets us read pixels without tainting the canvas.
+  const toDataUrl = (url) => new Promise((resolve) => {
+    if (!url) return resolve('');
+    if (url.startsWith('data:')) return resolve(url);
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    let done = false;
+    const finish = (value) => { if (!done) { done = true; resolve(value); } };
+    img.onload = () => {
+      try {
+        const cv = document.createElement('canvas');
+        cv.width = img.naturalWidth;
+        cv.height = img.naturalHeight;
+        cv.getContext('2d').drawImage(img, 0, 0);
+        finish(cv.toDataURL('image/jpeg', 0.85));
+      } catch (e) {
+        console.warn('canvas extract failed, using URL', url, e);
+        finish(url);
+      }
+    };
+    img.onerror = () => { console.warn('preload failed', url); finish(url); };
+    setTimeout(() => finish(url), 8000);
+    img.src = url;
+  });
+
+  // Pre-warm the browser image cache as soon as the card mounts (own checkins
+  // only — only they get a 海报 button). By the time the user taps 海报 the
+  // image is already cached and the canvas extract is instant.
+  useEffect(() => {
+    if (!isOwn) return;
+    const urls = [
+      ...((checkin.images || [])),
+      checkin.image_1, checkin.image_2, checkin.image_3,
+      checkin.avatar_url
+    ].filter(u => u && !u.startsWith?.('data:'));
+    urls.forEach(url => {
+      const i = new Image();
+      i.crossOrigin = 'anonymous';
+      i.src = url;
+    });
+  }, [checkin.id, isOwn]);
 
   const { date, time } = formatDateTime(checkin.created_at);
   const isOwn = checkin.user_id == currentUserId;
