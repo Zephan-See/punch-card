@@ -27,10 +27,18 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,png,svg,woff2}'],
-        // Apps Script API responses change — don't cache them
+        // Take control of all open clients as soon as a new SW activates,
+        // and skip the waiting phase so deploys propagate immediately.
+        skipWaiting: true,
+        clientsClaim: true,
+        // Always go to network for API calls; never serve stale data.
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/script\.google\.com\/.*/i,
+            handler: 'NetworkOnly'
+          },
+          {
+            urlPattern: /supabase\.co/i,
             handler: 'NetworkOnly'
           }
         ]
