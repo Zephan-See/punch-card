@@ -24,6 +24,7 @@ export default function CheckinCard({ checkin, displayName, currentUserId, token
   const [posterLoading, setPosterLoading] = useState(false);
   const [posterMounted, setPosterMounted] = useState(false);
   const [posterCheckin, setPosterCheckin] = useState(null);
+  const [preloadedImages, setPreloadedImages] = useState(null); // {avatar, images:[]} or null
   const posterRef = useRef(null);
 
   const { date, time } = formatDateTime(checkin.created_at);
@@ -61,20 +62,23 @@ export default function CheckinCard({ checkin, displayName, currentUserId, token
     img.src = corsUrl(url);
   });
 
-  // Pre-warm the cache with the CORS-tagged URL so the eventual canvas read
-  // hits a clean cache entry, not the wall's non-CORS one.
+  // Convert all images to data URLs at mount time (own checkins only).
+  // By the time the user taps 海报, the data URLs are already in state —
+  // no fetch race, no canvas timing, no iOS Safari weirdness.
   useEffect(() => {
     if (!isOwn) return;
-    const urls = [
-      ...((checkin.images || [])),
-      checkin.image_1, checkin.image_2, checkin.image_3,
-      checkin.avatar_url
-    ].filter(u => u && !u.startsWith?.('data:'));
-    urls.forEach(url => {
-      const i = new Image();
-      i.crossOrigin = 'anonymous';
-      i.src = corsUrl(url);
-    });
+    let cancelled = false;
+    const imageList = Array.isArray(checkin.images) && checkin.images.length
+      ? checkin.images
+      : [checkin.image_1, checkin.image_2, checkin.image_3].filter(Boolean);
+    (async () => {
+      const [avatar, ...images] = await Promise.all([
+        toDataUrl(checkin.avatar_url),
+        ...imageList.map(toDataUrl)
+      ]);
+      if (!cancelled) setPreloadedImages({ avatar, images });
+    })();
+    return () => { cancelled = true; };
   }, [checkin.id, isOwn]);
 
   const loadComments = async () => {
@@ -178,17 +182,21 @@ export default function CheckinCard({ checkin, displayName, currentUserId, token
     if (posterLoading) return;
     setPosterLoading(true);
     try {
-      // Preload every remote image as a base64 data URL FIRST.
-      // The Poster then renders with inline data — no cross-origin fetch
-      // happens during html-to-image, no race condition.
-      const imageList = Array.isArray(checkin.images)
-        ? checkin.images
-        : [checkin.image_1, checkin.image_2, checkin.image_3].filter(Boolean);
-
-      const [avatarData, ...imagesData] = await Promise.all([
-        toDataUrl(checkin.avatar_url),
-        ...imageList.map(toDataUrl)
-      ]);
+      // Use the pre-converted data URLs if mount-time preload finished.
+      // Otherwise do the live conversion (rare — user clicked within ms).
+      let avatarData, imagesData;
+      if (preloadedImages) {
+        avatarData = preloadedImages.avatar;
+        imagesData = preloadedImages.images;
+      } else {
+        const imageList = Array.isArray(checkin.images) && checkin.images.length
+          ? checkin.images
+          : [checkin.image_1, checkin.image_2, checkin.image_3].filter(Boolean);
+        [avatarData, ...imagesData] = await Promise.all([
+          toDataUrl(checkin.avatar_url),
+          ...imageList.map(toDataUrl)
+        ]);
+      }
 
       const preparedCheckin = {
         ...checkin,
