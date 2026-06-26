@@ -23,6 +23,7 @@ export default function CheckinCard({ checkin, displayName, currentUserId, token
   const [posterUrl, setPosterUrl] = useState(null);
   const [posterLoading, setPosterLoading] = useState(false);
   const [posterMounted, setPosterMounted] = useState(false);
+  const [posterPainted, setPosterPainted] = useState(false);  // iOS: in-viewport so pixels actually get drawn
   const [posterCheckin, setPosterCheckin] = useState(null);
   const [preloadedImages, setPreloadedImages] = useState(null); // {avatar, images:[]} or null
   const posterRef = useRef(null);
@@ -244,9 +245,13 @@ export default function CheckinCard({ checkin, displayName, currentUserId, token
         } catch (e) { /* don't block on a single bad image */ }
       }));
 
-      // Extra paint cycles — iOS Safari sometimes needs more than two
+      // Bring the poster INTO the viewport so iOS Safari actually paints
+      // pixels (off-screen elements at left:-9999px get layout but no paint
+      // — html-to-image then captures an empty container).
+      setPosterPainted(true);
+      // Two rAFs + a short timer to make sure paint commits before we snapshot
       await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
-      await new Promise(r => setTimeout(r, 150));
+      await new Promise(r => setTimeout(r, 200));
 
       const { toPng } = await import('html-to-image');
       const dataUrl = await toPng(posterRef.current, { pixelRatio: 2 });
@@ -254,6 +259,7 @@ export default function CheckinCard({ checkin, displayName, currentUserId, token
     } catch (e) {
       alert('生成海报失败：' + e.message);
     } finally {
+      setPosterPainted(false);
       setPosterLoading(false);
     }
   };
@@ -430,9 +436,16 @@ export default function CheckinCard({ checkin, displayName, currentUserId, token
         )}
       </div>
 
-      {/* Off-screen poster — uses preloaded data-URL images to avoid CORS race */}
+      {/* Poster render target. Two-stage positioning for iOS Safari:
+          - posterPainted=false: kept in flow at top-left under z=40 (loader is z=50) so Safari paints it,
+            but the loader overlay completely covers it
+          - posterPainted=true: same position, ready for html-to-image snapshot
+          Off-screen (left:-9999px) is unreliable — iOS skips paint and we end up snapshotting an empty box. */}
       {isOwn && posterMounted && posterCheckin && (
-        <div style={{ position: 'fixed', left: '-9999px', top: 0, pointerEvents: 'none' }} aria-hidden="true">
+        <div
+          style={{ position: 'fixed', left: 0, top: 0, zIndex: 40, pointerEvents: 'none', opacity: posterPainted ? 1 : 0.01 }}
+          aria-hidden="true"
+        >
           <Suspense fallback={null}>
             <Poster ref={posterRef} checkin={posterCheckin} />
           </Suspense>
