@@ -31,14 +31,9 @@ export default function CheckinCard({ checkin, displayName, currentUserId, token
   const { date, time } = formatDateTime(checkin.created_at);
   const isOwn = checkin.user_id == currentUserId;
 
-  // ponytail: iOS Safari caches the wall's <img> WITHOUT crossOrigin; canvas
-  // then hits that tainted cache and toDataURL throws. Append a query param
-  // so it's a "new" URL → fresh request with proper CORS headers from Supabase.
-  const corsUrl = (url) => {
-    if (!url || url.startsWith('data:')) return url;
-    return url + (url.includes('?') ? '&' : '?') + 'c=1';
-  };
-
+  // The wall <img> tags now load with crossOrigin="anonymous" — Safari's
+  // image cache is therefore CORS-clean. Canvas extraction reads the same
+  // URL and hits the cache without re-fetching.
   const toDataUrl = (url) => new Promise((resolve) => {
     if (!url) return resolve('');
     if (url.startsWith('data:')) return resolve(url);
@@ -60,7 +55,7 @@ export default function CheckinCard({ checkin, displayName, currentUserId, token
     };
     img.onerror = () => { console.warn('preload failed', url); finish(url); };
     setTimeout(() => finish(url), 8000);
-    img.src = corsUrl(url);
+    img.src = url;
   });
 
   // Convert all images to data URLs at mount time (own checkins only).
@@ -307,7 +302,7 @@ export default function CheckinCard({ checkin, displayName, currentUserId, token
       )}
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
-          {checkin.avatar_url && <img src={checkin.avatar_url} alt="" loading="lazy" decoding="async" className="w-8 h-8 rounded-full" />}
+          {checkin.avatar_url && <img src={checkin.avatar_url} alt="" loading="lazy" decoding="async" crossOrigin="anonymous" className="w-8 h-8 rounded-full" />}
           <div>
             <p className="font-semibold">{displayName || checkin.name || '打卡达人'}</p>
             <p className="text-xs text-gray-500">{date} {time}</p>
@@ -360,6 +355,7 @@ export default function CheckinCard({ checkin, displayName, currentUserId, token
                     alt=""
                     loading="lazy"
                     decoding="async"
+                    crossOrigin="anonymous"
                     className={`w-full object-cover rounded-lg cursor-pointer hover:opacity-90 ${
                       images.length === 1 ? 'max-h-96' : 'aspect-square'
                     }`}
@@ -452,9 +448,10 @@ export default function CheckinCard({ checkin, displayName, currentUserId, token
         </div>
       )}
 
-      {/* Loading overlay: shown the moment user taps 海报, until the PNG is ready */}
+      {/* Loading overlay: fully opaque so the in-viewport poster underneath
+          (opacity 0.01 — there only to force iOS Safari paint) is invisible */}
       {posterLoading && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-50 flex flex-col items-center justify-center">
+        <div className="fixed inset-0 bg-gray-900 z-50 flex flex-col items-center justify-center">
           <div className="w-12 h-12 border-4 border-white/30 border-t-white rounded-full animate-spin"></div>
           <p className="text-white/90 text-sm mt-4 font-medium">生成海报中…</p>
           <p className="text-white/60 text-xs mt-1">正在加载图片</p>
