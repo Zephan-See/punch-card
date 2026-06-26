@@ -4,7 +4,7 @@
 
 create table if not exists public.reports (
   id uuid primary key default gen_random_uuid(),
-  checkin_id uuid references public.checkins(id) on delete cascade,
+  checkin_id bigint references public.checkins(id) on delete cascade,
   reporter_id uuid references auth.users(id) on delete set null,
   reason text not null default '',
   status text not null default 'pending',  -- pending | resolved
