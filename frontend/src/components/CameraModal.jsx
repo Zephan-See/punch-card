@@ -20,8 +20,9 @@ export default function CameraModal({ onPhoto, onVideo, onClose, maxVideoSeconds
   const [facing, setFacing] = useState('environment');
   const [mode, setMode] = useState('live'); // live | recording | paused | photoPreview | videoPreview
   const [elapsed, setElapsed] = useState(0);
-  const [photoData, setPhotoData] = useState(null);
-  const [videoData, setVideoData] = useState(null);
+  const [photoData, setPhotoData] = useState(null);   // base64 (small)
+  const [videoBlob, setVideoBlob] = useState(null);   // Blob, previewed via objectURL
+  const [videoUrl, setVideoUrl] = useState(null);
   const [error, setError] = useState(null);
 
   // Open / re-open stream when facingMode changes
@@ -86,9 +87,9 @@ export default function CameraModal({ onPhoto, onVideo, onClose, maxVideoSeconds
     recorder.ondataavailable = (e) => { if (e.data && e.data.size) chunksRef.current.push(e.data); };
     recorder.onstop = () => {
       const blob = new Blob(chunksRef.current, { type: mimeType || 'video/webm' });
-      const reader = new FileReader();
-      reader.onload = () => { setVideoData(reader.result); setMode('videoPreview'); };
-      reader.readAsDataURL(blob);
+      setVideoBlob(blob);
+      setVideoUrl(URL.createObjectURL(blob));
+      setMode('videoPreview');
     };
     recorderRef.current = recorder;
     recorder.start();
@@ -136,20 +137,27 @@ export default function CameraModal({ onPhoto, onVideo, onClose, maxVideoSeconds
 
   const retake = () => {
     setPhotoData(null);
-    setVideoData(null);
+    if (videoUrl) URL.revokeObjectURL(videoUrl);
+    setVideoBlob(null);
+    setVideoUrl(null);
     setElapsed(0);
     setMode('live');
   };
 
   const close = () => {
     if (streamRef.current) streamRef.current.getTracks().forEach(t => t.stop());
+    if (videoUrl) URL.revokeObjectURL(videoUrl);
     onClose();
   };
 
   const confirm = () => {
-    if (mode === 'photoPreview') onPhoto(photoData);
-    else if (mode === 'videoPreview') onVideo(videoData);
-    close();
+    if (mode === 'photoPreview') {
+      onPhoto(photoData);
+    } else if (mode === 'videoPreview') {
+      onVideo(videoBlob);  // parent owns the blob now; don't revoke here
+    }
+    if (streamRef.current) streamRef.current.getTracks().forEach(t => t.stop());
+    onClose();
   };
 
   return (
@@ -173,7 +181,7 @@ export default function CameraModal({ onPhoto, onVideo, onClose, maxVideoSeconds
         ) : mode === 'photoPreview' ? (
           <img src={photoData} alt="预览" className="max-w-full max-h-full object-contain" />
         ) : mode === 'videoPreview' ? (
-          <video src={videoData} controls autoPlay loop playsInline className="max-w-full max-h-full" />
+          <video src={videoUrl} controls autoPlay loop playsInline className="max-w-full max-h-full" />
         ) : (
           <video
             ref={videoRef}

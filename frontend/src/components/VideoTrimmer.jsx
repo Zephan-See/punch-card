@@ -125,9 +125,8 @@ export default function VideoTrimmer({ file, maxSeconds = 30, onTrimmed, onClose
       ac.close();
 
       const blob = new Blob(chunks, { type: mimeType || 'video/webm' });
-      const reader = new FileReader();
-      reader.onload = () => { onTrimmed(reader.result); onClose(); };
-      reader.readAsDataURL(blob);
+      onTrimmed(blob);
+      onClose();
     } catch (e) {
       setError('裁切失败：' + (e.message || ''));
       setEncoding(false);

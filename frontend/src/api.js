@@ -27,9 +27,12 @@ async function uploadMedia(userId, file, prefix) {
 }
 
 async function uploadIfDataUrl(userId, value, prefix) {
-  if (!value || !value.startsWith?.('data:')) return value || '';
-  const blob = dataUrlToBlob(value);
-  return uploadMedia(userId, blob, prefix);
+  if (!value) return '';
+  if (value instanceof Blob) return uploadMedia(userId, value, prefix);
+  if (typeof value === 'string' && value.startsWith('data:')) {
+    return uploadMedia(userId, dataUrlToBlob(value), prefix);
+  }
+  return typeof value === 'string' ? value : '';
 }
 
 // Use the locally cached session — no network round-trip, no JWT-verify

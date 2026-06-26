@@ -1,4 +1,4 @@
-import { useState, useContext } from 'react';
+import { useState, useContext, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, Pencil, Camera, Mic, Video, Check, Lightbulb, Package, Music } from 'lucide-react';
 import { AuthContext } from '../AuthContext';
@@ -15,7 +15,9 @@ export default function CheckIn() {
   const [content, setContent] = useState('');
   const [images, setImages] = useState([]);
   const [audio, setAudio] = useState(null);
-  const [video, setVideo] = useState(null);
+  const [video, setVideo] = useState(null);   // Blob — preview via objectURL, base64 conversion only at submit-blocked
+  const videoUrl = useMemo(() => video ? URL.createObjectURL(video) : null, [video]);
+  useEffect(() => () => { if (videoUrl) URL.revokeObjectURL(videoUrl); }, [videoUrl]);
   const [loading, setLoading] = useState(false);
   const [cameraOpen, setCameraOpen] = useState(false);
   const [audioOpen, setAudioOpen] = useState(false);
@@ -26,7 +28,7 @@ export default function CheckIn() {
   const totalSize = (
     images.reduce((s, img) => s + img.length, 0) +
     (audio?.length || 0) +
-    (video?.length || 0)
+    (video?.size || 0)
   );
 
   // Gallery picker (multi-select existing photos)
@@ -82,9 +84,9 @@ export default function CheckIn() {
     setImages(prev => prev.length < MAX_IMAGES ? [...prev, base64] : prev);
   };
 
-  const handleCameraVideo = (base64) => {
+  const handleCameraVideo = (blob) => {
     if (images.length > 0) { alert('已有图片，请先移除再保存视频'); return; }
-    setVideo(base64);
+    setVideo(blob);
   };
 
   const handleVideoUpload = async (e) => {
@@ -113,14 +115,19 @@ export default function CheckIn() {
     URL.revokeObjectURL(url);
 
     if (isFinite(duration) && duration <= VIDEO_MAX_SECONDS + 0.5) {
-      const reader = new FileReader();
-      reader.onload = () => setVideo(reader.result);
-      reader.readAsDataURL(file);
+      setVideo(file);
       return;
     }
 
     if (!canTrimVideo()) {
-      return alert(`视频超过 ${VIDEO_MAX_SECONDS} 秒，您的浏览器暂不支持在线裁切。\n请用相册的剪辑工具先裁到 ${VIDEO_MAX_SECONDS} 秒以内再上传。`);
+      return alert(
+        `视频超过 ${VIDEO_MAX_SECONDS} 秒，Safari 暂不支持在线裁切。\n` +
+        `请先在「相册」里编辑这段视频：\n` +
+        `1. 打开相册 → 找到视频 → 点「编辑」\n` +
+        `2. 拖动两端滑块裁到 ${VIDEO_MAX_SECONDS} 秒内\n` +
+        `3. 点「完成」→ 另存为新视频\n` +
+        `4. 回来重新上传新视频`
+      );
     }
     setTrimmerFile(file);
   };
@@ -137,7 +144,7 @@ export default function CheckIn() {
       const res = await api.checkIn(user.token, content || '(媒体打卡)', {
         images,
         audio_url: audio || '',
-        video_url: video || ''
+        video_url: video || ''   // Blob or '' — api.uploadIfDataUrl now handles both
       });
       if (res.error) {
         alert(res.error === '已打卡' ? '👍 今天已经完成打卡了！\n\n明日记得继续打卡哦！' : res.error);
@@ -198,15 +205,15 @@ export default function CheckIn() {
             </div>
           )}
 
-          {video && (
+          {video && videoUrl && (
             <div className="relative bg-gray-50 rounded-lg p-2">
               <button
                 type="button"
                 onClick={() => setVideo(null)}
                 className="absolute top-2 right-2 bg-red-500 text-white w-7 h-7 rounded-full text-sm hover:bg-red-600 z-10"
               >✕</button>
-              <video src={video} controls playsInline className="rounded max-h-64 mx-auto" />
-              <p className="text-xs text-gray-500 text-center mt-1 inline-flex items-center justify-center gap-1 w-full"><Video size={12} /> {Math.round(video.length / 1024)}KB</p>
+              <video src={videoUrl} controls playsInline preload="metadata" className="rounded max-h-64 mx-auto" />
+              <p className="text-xs text-gray-500 text-center mt-1 inline-flex items-center justify-center gap-1 w-full"><Video size={12} /> {Math.round(video.size / 1024)}KB</p>
             </div>
           )}
 
