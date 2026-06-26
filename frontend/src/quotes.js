@@ -125,7 +125,8 @@ export const QUOTES = [
 
 // Deterministic daily pick — all users see same quote per calendar day.
 export function pickDaily(date = new Date()) {
-  const key = date.toISOString().slice(0, 10); // YYYY-MM-DD
+  // KL timezone so the quote rotates at Malaysian midnight, not UTC midnight
+  const key = date.toLocaleDateString('en-CA', { timeZone: 'Asia/Kuala_Lumpur' });
   let hash = 0;
   for (let i = 0; i < key.length; i++) {
     hash = ((hash << 5) - hash) + key.charCodeAt(i);

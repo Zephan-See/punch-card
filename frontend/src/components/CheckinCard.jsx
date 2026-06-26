@@ -1,5 +1,5 @@
 import { useState, useRef, lazy, Suspense, useEffect } from 'react';
-import { Heart, MessageCircle, Share2, ImageIcon, Send, Download } from 'lucide-react';
+import { Heart, MessageCircle, Share2, ImageIcon, Send, Download, Flag } from 'lucide-react';
 import { api } from '../api';
 
 // Poster + its deps (html-to-image, qrcode.react) are ~150KB — only load
@@ -149,6 +149,14 @@ export default function CheckinCard({ checkin, displayName, currentUserId, token
       await loadComments();
       onUpdate({ comment_count: Math.max(0, (checkin.comment_count || 1) - 1) });
     }
+  };
+
+  const handleReport = async () => {
+    const reason = prompt('请简单说明举报原因（管理员会审核处理）');
+    if (reason === null) return; // user cancelled
+    const res = await api.reportCheckin(token, checkin.id, reason);
+    if (res.error) alert('❌ 举报失败：' + res.error);
+    else alert('✅ 已提交举报，谢谢你的反馈');
   };
 
   const handleShare = async () => {
@@ -385,6 +393,17 @@ export default function CheckinCard({ checkin, displayName, currentUserId, token
           >
             <MessageCircle size={16} strokeWidth={2} />
             <span className="font-medium">{isOwn ? '补充' : '鼓励'} {checkin.comment_count || 0}</span>
+          </button>
+        )}
+
+        {/* Non-owners can flag content */}
+        {!isOwn && token && (
+          <button
+            onClick={handleReport}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm bg-gray-50 text-gray-500 hover:bg-yellow-50 hover:text-yellow-700 transition"
+            title="举报"
+          >
+            <Flag size={16} strokeWidth={2} />
           </button>
         )}
 

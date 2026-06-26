@@ -136,7 +136,8 @@ export const api = {
   checkIn: async (_token, content, media = {}) => {
     const uid = await currentUserId();
     if (!uid) return { error: '未登录' };
-    const today = new Date().toISOString().slice(0, 10);
+    // Pin to Malaysia timezone so a 1 AM (UTC+8) checkin doesn't land on yesterday's UTC date
+    const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kuala_Lumpur' });
 
     // Accept either an `images` array or legacy image_1/2/3 props
     const inputImages = Array.isArray(media.images)
@@ -351,6 +352,43 @@ export const api = {
 
   adminDeleteCheckin: async (_token, checkinId) => {
     const { error } = await supabase.from('checkins').delete().eq('id', checkinId);
+    if (error) return { error: error.message };
+    return { ok: true };
+  },
+
+  reportCheckin: async (_token, checkinId, reason) => {
+    const uid = await currentUserId();
+    if (!uid) return { error: '未登录' };
+    const { error } = await supabase.from('reports').insert({
+      checkin_id: checkinId,
+      reporter_id: uid,
+      reason: (reason || '').slice(0, 500)
+    });
+    if (error) return { error: error.message };
+    return { ok: true };
+  },
+
+  adminGetReports: async () => {
+    const { data, error } = await supabase
+      .from('reports')
+      .select('id, checkin_id, reporter_id, reason, status, created_at, checkins(id, user_id, content, hidden_at)')
+      .eq('status', 'pending')
+      .order('created_at', { ascending: false });
+    if (error) { console.error(error); return []; }
+    const ids = [...new Set((data || []).map(r => r.reporter_id).filter(Boolean))];
+    let nameMap = {};
+    if (ids.length) {
+      const { data: ps } = await supabase.from('profiles').select('id, name').in('id', ids);
+      nameMap = Object.fromEntries((ps || []).map(p => [p.id, p.name]));
+    }
+    return (data || []).map(r => ({ ...r, reporter_name: nameMap[r.reporter_id] || '未知' }));
+  },
+
+  adminResolveReport: async (_token, reportId) => {
+    const { error } = await supabase
+      .from('reports')
+      .update({ status: 'resolved', resolved_at: new Date().toISOString() })
+      .eq('id', reportId);
     if (error) return { error: error.message };
     return { ok: true };
   },

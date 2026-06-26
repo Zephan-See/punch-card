@@ -19,7 +19,9 @@ create policy "checkins: read public" on public.checkins for select using (
 );
 
 -- Rebuild feed_v to expose hidden_at to the frontend.
-create or replace view public.feed_v as
+-- DROP first because CREATE OR REPLACE can't change column order.
+drop view if exists public.feed_v;
+create view public.feed_v as
 select
   c.id,
   c.user_id,

@@ -45,21 +45,24 @@ function msUntil(hhmm) {
   return next - now;
 }
 
+// All date keys in Malaysia timezone so streaks roll over at KL midnight, not UTC.
+const klDate = (d) => d.toLocaleDateString('en-CA', { timeZone: 'Asia/Kuala_Lumpur' });
+
 function computeStreak(checkins) {
   if (!checkins?.length) return 0;
   const dates = new Set(checkins.map(c => c.checked_date));
-  const today = new Date().toISOString().slice(0, 10);
+  const today = klDate(new Date());
   let streak = dates.has(today) ? 1 : 0;
   if (!streak) {
     // allow yesterday too
-    const y = new Date(Date.now() - 86400_000).toISOString().slice(0, 10);
+    const y = klDate(new Date(Date.now() - 86400_000));
     if (!dates.has(y)) return 0;
     streak = 1;
   }
   const cur = new Date(streak === 1 && !dates.has(today) ? Date.now() - 86400_000 : Date.now());
   for (let i = 1; i < 365; i++) {
     cur.setDate(cur.getDate() - 1);
-    const k = cur.toISOString().slice(0, 10);
+    const k = klDate(cur);
     if (dates.has(k)) streak++; else break;
   }
   return streak;

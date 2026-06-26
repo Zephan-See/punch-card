@@ -1,6 +1,6 @@
 import { useState, useEffect, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, Shield, RotateCw, BarChart3, Users, ClipboardList, Pencil, CalendarDays, TrendingUp, Heart } from 'lucide-react';
+import { ChevronLeft, Shield, RotateCw, BarChart3, Users, ClipboardList, Pencil, CalendarDays, TrendingUp, Heart, Flag } from 'lucide-react';
 import { AuthContext } from '../../AuthContext';
 import { api } from '../../api';
 
@@ -10,6 +10,7 @@ export default function AdminDashboard() {
   const [tab, setTab] = useState('stats');
   const [users, setUsers] = useState([]);
   const [checkins, setCheckins] = useState([]);
+  const [reports, setReports] = useState([]);
   const [activityName, setActivityName] = useState('');
   const [editingActivity, setEditingActivity] = useState(false);
   const { user } = useContext(AuthContext);
@@ -41,6 +42,9 @@ export default function AdminDashboard() {
       } else if (tab === 'checkins') {
         const data = await api.adminAllCheckins(user.token);
         setCheckins(data);
+      } else if (tab === 'reports') {
+        const data = await api.adminGetReports(user.token);
+        setReports(data);
       }
     } finally {
       setLoading(false);
@@ -68,6 +72,19 @@ export default function AdminDashboard() {
     const res = await api.adminDeleteCheckin(user.token, checkinId);
     if (res.error) alert('❌ ' + res.error);
     else { alert('✅ 已删除'); loadAll(); }
+  };
+
+  const handleResolveReport = async (reportId, alsoHideId) => {
+    if (alsoHideId) {
+      if (!confirm('确定隐藏被举报的打卡，并标记此举报已处理？')) return;
+      const h = await api.adminToggleHideCheckin(user.token, alsoHideId, true);
+      if (h.error) return alert('❌ 隐藏失败：' + h.error);
+    } else {
+      if (!confirm('标记此举报已处理（不采取行动）？')) return;
+    }
+    const res = await api.adminResolveReport(user.token, reportId);
+    if (res.error) alert('❌ ' + res.error);
+    else { alert('✅ 已处理'); loadAll(); }
   };
 
   const handleToggleHideCheckin = async (checkinId, isHidden) => {
@@ -105,7 +122,8 @@ export default function AdminDashboard() {
           {[
             { key: 'stats', label: '统计', Icon: BarChart3 },
             { key: 'users', label: '用户', Icon: Users },
-            { key: 'checkins', label: '打卡', Icon: ClipboardList }
+            { key: 'checkins', label: '打卡', Icon: ClipboardList },
+            { key: 'reports', label: '举报', Icon: Flag }
           ].map(t => (
             <button
               key={t.key}
@@ -258,6 +276,50 @@ export default function AdminDashboard() {
                       </div>
                     )}
                   </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : tab === 'reports' ? (
+          <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+            <div className="p-3 border-b bg-gray-50">
+              <h3 className="font-bold text-sm inline-flex items-center gap-1.5"><Flag size={14} /> 待处理举报（{reports.length}）</h3>
+            </div>
+            {reports.length === 0 ? (
+              <p className="text-center text-gray-400 text-sm py-8">暂无待处理举报</p>
+            ) : reports.map(r => (
+              <div key={r.id} className="p-3 border-b last:border-b-0">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-xs text-gray-500">
+                    举报人：<span className="text-gray-700 font-medium">{r.reporter_name}</span> · {new Date(r.created_at).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                  </p>
+                </div>
+                <p className="text-sm text-yellow-800 bg-yellow-50 border border-yellow-200 rounded px-3 py-2 mb-2">
+                  <span className="font-semibold">原因：</span>{r.reason || '（未填）'}
+                </p>
+                {r.checkins ? (
+                  <div className="bg-gray-50 rounded p-3 mb-2 text-sm">
+                    {r.checkins.hidden_at && <span className="inline-block text-xs bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded mr-1">已隐藏</span>}
+                    <span className="text-gray-700 whitespace-pre-wrap">{r.checkins.content}</span>
+                  </div>
+                ) : (
+                  <p className="text-xs text-gray-400 italic mb-2">原打卡已被删除</p>
+                )}
+                <div className="flex gap-2">
+                  {r.checkins && !r.checkins.hidden_at && (
+                    <button
+                      onClick={() => handleResolveReport(r.id, r.checkin_id)}
+                      className="text-xs bg-yellow-500 text-white px-3 py-1.5 rounded-full"
+                    >
+                      隐藏并标记处理
+                    </button>
+                  )}
+                  <button
+                    onClick={() => handleResolveReport(r.id, null)}
+                    className="text-xs bg-gray-200 text-gray-700 px-3 py-1.5 rounded-full"
+                  >
+                    标记已处理
+                  </button>
                 </div>
               </div>
             ))}
