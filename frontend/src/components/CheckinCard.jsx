@@ -23,7 +23,6 @@ export default function CheckinCard({ checkin, displayName, currentUserId, token
   const [posterUrl, setPosterUrl] = useState(null);
   const [posterLoading, setPosterLoading] = useState(false);
   const [posterMounted, setPosterMounted] = useState(false);
-  const [posterPainted, setPosterPainted] = useState(false);  // iOS: in-viewport so pixels actually get drawn
   const [posterCheckin, setPosterCheckin] = useState(null);
   const [preloadedImages, setPreloadedImages] = useState(null); // {avatar, images:[]} or null
   const posterRef = useRef(null);
@@ -240,21 +239,21 @@ export default function CheckinCard({ checkin, displayName, currentUserId, token
         } catch (e) { /* don't block on a single bad image */ }
       }));
 
-      // Bring the poster INTO the viewport so iOS Safari actually paints
-      // pixels (off-screen elements at left:-9999px get layout but no paint
-      // — html-to-image then captures an empty container).
-      setPosterPainted(true);
-      // Two rAFs + a short timer to make sure paint commits before we snapshot
+      // Two rAFs + a short timer to make sure paint commits before snapshot
       await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
       await new Promise(r => setTimeout(r, 200));
 
       const { toPng } = await import('html-to-image');
+      // iOS Safari race: html-to-image's first SVG-foreignObject pass sometimes
+      // captures before image pixels are fully decoded. Throw away the first
+      // result and capture again — second run hits the warmed-up decode state.
+      // This is exactly what "click 海报 twice and it works" was demonstrating.
+      try { await toPng(posterRef.current, { pixelRatio: 2 }); } catch (e) {}
       const dataUrl = await toPng(posterRef.current, { pixelRatio: 2 });
       setPosterUrl(dataUrl);
     } catch (e) {
       alert('生成海报失败：' + e.message);
     } finally {
-      setPosterPainted(false);
       setPosterLoading(false);
     }
   };
@@ -432,14 +431,12 @@ export default function CheckinCard({ checkin, displayName, currentUserId, token
         )}
       </div>
 
-      {/* Poster render target. Two-stage positioning for iOS Safari:
-          - posterPainted=false: kept in flow at top-left under z=40 (loader is z=50) so Safari paints it,
-            but the loader overlay completely covers it
-          - posterPainted=true: same position, ready for html-to-image snapshot
-          Off-screen (left:-9999px) is unreliable — iOS skips paint and we end up snapshotting an empty box. */}
+      {/* Poster render target: always in-viewport (iOS needs that for paint),
+          z-40 under the opaque z-50 loader so the user never sees it. No
+          opacity tricks — the loader is fully opaque (bg-gray-900). */}
       {isOwn && posterMounted && posterCheckin && (
         <div
-          style={{ position: 'fixed', left: 0, top: 0, zIndex: 40, pointerEvents: 'none', opacity: posterPainted ? 1 : 0.01 }}
+          style={{ position: 'fixed', left: 0, top: 0, zIndex: 40, pointerEvents: 'none' }}
           aria-hidden="true"
         >
           <Suspense fallback={null}>
