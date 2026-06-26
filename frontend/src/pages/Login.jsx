@@ -106,6 +106,21 @@ export default function Login() {
         >
           {mode === 'login' ? '还没有账号？注册一个' : mode === 'register' ? '已有账号？登录' : '返回登录'}
         </button>
+
+        {mode === 'register' && (
+          <p className="text-center text-xs text-gray-400 mt-3 leading-relaxed">
+            注册即表示你已阅读并同意
+            <a href="/terms" className="text-indigo-600 hover:underline mx-0.5">服务条款</a>
+            和
+            <a href="/privacy" className="text-indigo-600 hover:underline mx-0.5">隐私政策</a>
+          </p>
+        )}
+
+        <div className="flex items-center justify-center gap-3 mt-6 text-xs text-gray-400">
+          <a href="/terms" className="hover:text-gray-600">服务条款</a>
+          <span>·</span>
+          <a href="/privacy" className="hover:text-gray-600">隐私政策</a>
+        </div>
       </div>
     </div>
   );

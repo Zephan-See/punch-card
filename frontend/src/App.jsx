@@ -17,6 +17,8 @@ const Profile = lazy(() => import('./pages/Profile'));
 const Goals = lazy(() => import('./pages/Goals'));
 const AdminDashboard = lazy(() => import('./pages/admin/Dashboard'));
 const ResetPassword = lazy(() => import('./pages/ResetPassword'));
+const Privacy = lazy(() => import('./pages/Privacy'));
+const Terms = lazy(() => import('./pages/Terms'));
 
 const Loading = () => (
   <div className="min-h-screen flex items-center justify-center">
@@ -36,6 +38,8 @@ function AppContent() {
           <Route path="/login" element={!user ? <Login /> : <Navigate to="/home" />} />
           {/* /reset is reachable from the email link even though Supabase auto-creates a recovery session */}
           <Route path="/reset" element={<ResetPassword />} />
+          <Route path="/privacy" element={<Privacy />} />
+          <Route path="/terms" element={<Terms />} />
           <Route path="/" element={user ? <Navigate to="/home" /> : <Navigate to="/login" />} />
           <Route path="/home" element={user ? <Home /> : <Navigate to="/login" />} />
           <Route path="/checkin" element={user ? <CheckIn /> : <Navigate to="/login" />} />

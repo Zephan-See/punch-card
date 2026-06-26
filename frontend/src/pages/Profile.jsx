@@ -1,6 +1,6 @@
 import { useState, useEffect, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, Settings, Check, Lock, Bell } from 'lucide-react';
+import { ChevronLeft, Settings, Check, Lock, Bell, Download, Shield, FileText } from 'lucide-react';
 import { loadSettings, saveSettings } from '../components/NotificationManager';
 import { AuthContext } from '../AuthContext';
 import { api } from '../api';
@@ -85,6 +85,47 @@ export default function Profile() {
       setWallPublic(newStatus);
     } catch (e) {
       alert('设置失败');
+    }
+  };
+
+  const handleExportData = async () => {
+    try {
+      const checkins = await api.getMyCheckins();
+      const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六'];
+      const lines = [
+        `# ${profile?.name || '我'} 的打卡日记`,
+        '',
+        `导出时间：${new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Kuala_Lumpur' })}`,
+        `共 ${checkins.length} 篇`,
+        '',
+        '---',
+        ''
+      ];
+      // chronological order — oldest first reads more like a journal
+      [...checkins].reverse().forEach(c => {
+        const d = new Date(c.created_at);
+        const weekday = '星期' + WEEKDAYS[d.getDay()];
+        lines.push(`## ${d.toLocaleDateString('zh-CN', { timeZone: 'Asia/Kuala_Lumpur' })} ${weekday}`);
+        lines.push('');
+        lines.push(c.content || '(媒体打卡)');
+        lines.push('');
+        const imgs = Array.isArray(c.images) ? c.images : [c.image_1, c.image_2, c.image_3].filter(Boolean);
+        imgs.forEach((u, i) => lines.push(`![图片${i + 1}](${u})`));
+        if (c.audio_url) lines.push(`[语音](${c.audio_url})`);
+        if (c.video_url) lines.push(`[视频](${c.video_url})`);
+        lines.push('');
+        lines.push('---');
+        lines.push('');
+      });
+      const blob = new Blob([lines.join('\n')], { type: 'text/markdown;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `打卡日记-${new Date().toISOString().slice(0, 10)}.md`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      alert('导出失败：' + e.message);
     }
   };
 
@@ -315,6 +356,27 @@ export default function Profile() {
           <p className="text-xs text-gray-500 mt-3">
             通知只在网页打开时触发。装到主屏后效果更可靠。
           </p>
+        </div>
+
+        <div className="bg-white rounded-lg shadow-sm p-6 mb-4">
+          <h3 className="font-semibold mb-4">数据</h3>
+          <button
+            onClick={handleExportData}
+            className="w-full bg-gray-100 hover:bg-gray-200 text-gray-800 px-4 py-2.5 rounded-lg font-medium inline-flex items-center justify-center gap-2 mb-2"
+          >
+            <Download size={16} /> 导出我的打卡日记
+          </button>
+          <p className="text-xs text-gray-500">下载所有打卡为 Markdown 文件，可在任何笔记 App 打开</p>
+        </div>
+
+        <div className="bg-white rounded-lg shadow-sm p-6 mb-4">
+          <h3 className="font-semibold mb-3">关于</h3>
+          <button onClick={() => navigate('/terms')} className="w-full text-left py-2 inline-flex items-center gap-2 text-gray-700 hover:text-indigo-600">
+            <FileText size={16} /> 服务条款
+          </button>
+          <button onClick={() => navigate('/privacy')} className="w-full text-left py-2 inline-flex items-center gap-2 text-gray-700 hover:text-indigo-600">
+            <Shield size={16} /> 隐私政策
+          </button>
         </div>
 
         <div className="bg-white rounded-lg shadow-sm p-6">

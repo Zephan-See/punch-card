@@ -4,6 +4,7 @@ import { CalendarDays, Pin, Pencil, Lightbulb, Camera, Radio, Trophy, Settings, 
 import { AuthContext } from '../AuthContext';
 import { api } from '../api';
 import Mascot from '../components/Mascot';
+import Onboarding from '../components/Onboarding';
 
 export default function Home() {
   const navigate = useNavigate();
@@ -56,6 +57,7 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <Onboarding />
       <div className="bg-white shadow sticky top-0 z-50">
         <div className="max-w-md mx-auto px-4 py-4 flex items-center justify-between">
           <h1 className="text-xl font-bold flex items-center gap-2"><CalendarDays size={22} /> 打卡</h1>
