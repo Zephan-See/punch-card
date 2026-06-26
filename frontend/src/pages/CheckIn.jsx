@@ -5,6 +5,7 @@ import { AuthContext } from '../AuthContext';
 import { api } from '../api';
 import CameraModal from '../components/CameraModal';
 import AudioRecorder from '../components/AudioRecorder';
+import VideoTrimmer, { canTrimVideo } from '../components/VideoTrimmer';
 
 const VIDEO_MAX_SECONDS = 30;
 const AUDIO_MAX_SECONDS = 60;
@@ -18,6 +19,7 @@ export default function CheckIn() {
   const [loading, setLoading] = useState(false);
   const [cameraOpen, setCameraOpen] = useState(false);
   const [audioOpen, setAudioOpen] = useState(false);
+  const [trimmerFile, setTrimmerFile] = useState(null);
   const { user } = useContext(AuthContext);
   const navigate = useNavigate();
 
@@ -83,6 +85,44 @@ export default function CheckIn() {
   const handleCameraVideo = (base64) => {
     if (images.length > 0) { alert('已有图片，请先移除再保存视频'); return; }
     setVideo(base64);
+  };
+
+  const handleVideoUpload = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    if (images.length > 0) return alert('请先移除图片，图片和视频只能选一种');
+    if (audio) return alert('请先移除录音，录音和视频不能同时（视频自带声音）');
+    if (video) return alert('已有视频，请先移除');
+
+    const url = URL.createObjectURL(file);
+    const probe = document.createElement('video');
+    probe.preload = 'metadata';
+    probe.src = url;
+    let duration;
+    try {
+      await new Promise((res, rej) => {
+        probe.onloadedmetadata = () => res();
+        probe.onerror = () => rej(new Error('无法读取视频'));
+      });
+      duration = probe.duration;
+    } catch {
+      URL.revokeObjectURL(url);
+      return alert('❌ 无法读取这个视频文件');
+    }
+    URL.revokeObjectURL(url);
+
+    if (isFinite(duration) && duration <= VIDEO_MAX_SECONDS + 0.5) {
+      const reader = new FileReader();
+      reader.onload = () => setVideo(reader.result);
+      reader.readAsDataURL(file);
+      return;
+    }
+
+    if (!canTrimVideo()) {
+      return alert(`视频超过 ${VIDEO_MAX_SECONDS} 秒，您的浏览器暂不支持在线裁切。\n请用相册的剪辑工具先裁到 ${VIDEO_MAX_SECONDS} 秒以内再上传。`);
+    }
+    setTrimmerFile(file);
   };
 
   const handleSubmit = async (e) => {
@@ -170,8 +210,8 @@ export default function CheckIn() {
             </div>
           )}
 
-          {/* Media buttons: 相机(tap=photo, hold=video) · 相册 · 录音 */}
-          <div className="grid grid-cols-3 gap-2">
+          {/* Media buttons: 相机(tap=photo, hold=video) · 相册 · 视频上传 · 录音 */}
+          <div className="grid grid-cols-4 gap-2">
             <button
               type="button"
               onClick={openCamera}
@@ -182,8 +222,8 @@ export default function CheckIn() {
                   : 'bg-blue-50 hover:bg-blue-100 text-blue-700'
               }`}
             >
-              <Camera size={22} />
-              <span className="text-[11px] mt-1">相机</span>
+              <Camera size={20} />
+              <span className="text-[10px] mt-1">相机</span>
             </button>
 
             <label className={`flex flex-col items-center justify-center py-3 rounded-lg cursor-pointer transition ${
@@ -191,8 +231,8 @@ export default function CheckIn() {
                 ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
                 : 'bg-cyan-50 hover:bg-cyan-100 text-cyan-700'
             }`}>
-              <Package size={22} />
-              <span className="text-[11px] mt-1">相册 {images.length}/{MAX_IMAGES}</span>
+              <Package size={20} />
+              <span className="text-[10px] mt-1">相册 {images.length}/{MAX_IMAGES}</span>
               <input
                 type="file"
                 accept="image/*"
@@ -200,6 +240,22 @@ export default function CheckIn() {
                 className="hidden"
                 onChange={handleImageSelect}
                 disabled={!!video || images.length >= MAX_IMAGES}
+              />
+            </label>
+
+            <label className={`flex flex-col items-center justify-center py-3 rounded-lg cursor-pointer transition ${
+              !!video || !!audio || images.length > 0
+                ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                : 'bg-red-50 hover:bg-red-100 text-red-700'
+            }`}>
+              <Video size={20} />
+              <span className="text-[10px] mt-1">{video ? <><Check size={11} className="inline"/> 已选</> : `上传视频`}</span>
+              <input
+                type="file"
+                accept="video/*"
+                className="hidden"
+                onChange={handleVideoUpload}
+                disabled={!!video || !!audio || images.length > 0}
               />
             </label>
 
@@ -213,13 +269,13 @@ export default function CheckIn() {
                   : 'bg-green-50 hover:bg-green-100 text-green-700'
               }`}
             >
-              <Mic size={22} />
-              <span className="text-[11px] mt-1 inline-flex items-center gap-1">{audio ? <><Check size={12}/> 已录</> : `录音(${AUDIO_MAX_SECONDS}s)`}</span>
+              <Mic size={20} />
+              <span className="text-[10px] mt-1">{audio ? <><Check size={11} className="inline"/> 已录</> : `录音`}</span>
             </button>
           </div>
 
           <div className="text-xs text-gray-500 space-y-1">
-            <p className="inline-flex items-center gap-1.5"><Lightbulb size={12} /> 相机：点击拍照，长按录像 · 最多 {MAX_IMAGES} 张图片 · 视频/录音与图片互斥</p>
+            <p className="inline-flex items-center gap-1.5"><Lightbulb size={12} /> 相机：点击拍照，长按录像 · 视频最长 {VIDEO_MAX_SECONDS}s（超时可裁切）· 视频/录音与图片互斥</p>
             {totalSize > 0 && (
               <p>当前合计：{Math.round(totalSize / 1024)}KB（{[images.length > 0 ? `${images.length}图` : null, audio ? '录音' : null, video ? '视频' : null].filter(Boolean).join(' + ')}）</p>
             )}
@@ -250,6 +306,14 @@ export default function CheckIn() {
           onConfirm={setAudio}
           onClose={() => setAudioOpen(false)}
           maxSeconds={AUDIO_MAX_SECONDS}
+        />
+      )}
+      {trimmerFile && (
+        <VideoTrimmer
+          file={trimmerFile}
+          maxSeconds={VIDEO_MAX_SECONDS}
+          onTrimmed={setVideo}
+          onClose={() => setTrimmerFile(null)}
         />
       )}
     </div>
