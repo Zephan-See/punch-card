@@ -239,16 +239,25 @@ export default function CheckinCard({ checkin, displayName, currentUserId, token
         } catch (e) { /* don't block on a single bad image */ }
       }));
 
+      // CRITICAL for iOS Safari: img.decode() alone doesn't guarantee the
+      // bitmap is materialized — Safari keeps it "lazy" until something
+      // actually reads pixels. Drawing each image to a throwaway canvas
+      // FORCES Safari to produce a real bitmap. After this loop every img
+      // is guaranteed to have decoded pixels ready for html-to-image to use.
+      for (const img of imgs) {
+        try {
+          const cv = document.createElement('canvas');
+          cv.width = img.naturalWidth || 1;
+          cv.height = img.naturalHeight || 1;
+          cv.getContext('2d').drawImage(img, 0, 0);
+        } catch (e) { console.warn('bitmap warmup failed', e); }
+      }
+
       // Two rAFs + a short timer to make sure paint commits before snapshot
       await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
-      await new Promise(r => setTimeout(r, 200));
+      await new Promise(r => setTimeout(r, 100));
 
       const { toPng } = await import('html-to-image');
-      // iOS Safari race: html-to-image's first SVG-foreignObject pass sometimes
-      // captures before image pixels are fully decoded. Throw away the first
-      // result and capture again — second run hits the warmed-up decode state.
-      // This is exactly what "click 海报 twice and it works" was demonstrating.
-      try { await toPng(posterRef.current, { pixelRatio: 2 }); } catch (e) {}
       const dataUrl = await toPng(posterRef.current, { pixelRatio: 2 });
       setPosterUrl(dataUrl);
     } catch (e) {
@@ -431,12 +440,18 @@ export default function CheckinCard({ checkin, displayName, currentUserId, token
         )}
       </div>
 
-      {/* Poster render target: always in-viewport (iOS needs that for paint),
-          z-40 under the opaque z-50 loader so the user never sees it. No
-          opacity tricks — the loader is fully opaque (bg-gray-900). */}
+      {/* Poster render target. Stays mounted after first click (cheap reuse
+          for subsequent clicks), but opacity follows posterLoading so it's
+          only visible to iOS Safari's paint cycle during capture — never
+          to the user on the wall page. The opaque z-50 loader covers it
+          completely during capture. */}
       {isOwn && posterMounted && posterCheckin && (
         <div
-          style={{ position: 'fixed', left: 0, top: 0, zIndex: 40, pointerEvents: 'none' }}
+          style={{
+            position: 'fixed', left: 0, top: 0, zIndex: 40,
+            pointerEvents: 'none',
+            opacity: posterLoading ? 1 : 0
+          }}
           aria-hidden="true"
         >
           <Suspense fallback={null}>
