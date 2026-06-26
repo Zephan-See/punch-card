@@ -364,21 +364,36 @@ export default function CheckinCard({ checkin, displayName, currentUserId, token
                     loading="lazy"
                     decoding="async"
                     crossOrigin="anonymous"
-                    className={`w-full object-cover rounded-lg cursor-pointer hover:opacity-90 ${
+                    draggable={false}
+                    onContextMenu={isOwn ? undefined : (e) => e.preventDefault()}
+                    className={`w-full object-cover rounded-lg select-none ${
                       images.length === 1 ? 'max-h-96' : 'aspect-square'
                     }`}
-                    onClick={() => window.open(img, '_blank')}
+                    style={!isOwn ? { WebkitTouchCallout: 'none', WebkitUserSelect: 'none' } : undefined}
                   />
                 ))}
               </div>
             )}
-            {/* 视频 */}
+            {/* 视频 — 他人的禁止下载/PiP/右键 */}
             {video && (
-              <video src={video} controls className="rounded-lg w-full max-h-96 bg-black" />
+              <video
+                src={video}
+                controls
+                controlsList={isOwn ? undefined : 'nodownload noplaybackrate noremoteplayback'}
+                disablePictureInPicture={!isOwn}
+                onContextMenu={isOwn ? undefined : (e) => e.preventDefault()}
+                className="rounded-lg w-full max-h-96 bg-black"
+              />
             )}
-            {/* 录音 */}
+            {/* 录音 — 同上 */}
             {audio && (
-              <audio src={audio} controls className="w-full" />
+              <audio
+                src={audio}
+                controls
+                controlsList={isOwn ? undefined : 'nodownload'}
+                onContextMenu={isOwn ? undefined : (e) => e.preventDefault()}
+                className="w-full"
+              />
             )}
           </div>
         );
