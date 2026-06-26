@@ -1,6 +1,6 @@
 import { useState, useEffect, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, Shield, RotateCw, BarChart3, Users, ClipboardList, Pencil, CalendarDays, TrendingUp, Heart, Flag } from 'lucide-react';
+import { ChevronLeft, Shield, RotateCw, BarChart3, Users, ClipboardList, Pencil, CalendarDays, TrendingUp, Heart, Flag, ScrollText } from 'lucide-react';
 import { AuthContext } from '../../AuthContext';
 import { api } from '../../api';
 
@@ -11,6 +11,7 @@ export default function AdminDashboard() {
   const [users, setUsers] = useState([]);
   const [checkins, setCheckins] = useState([]);
   const [reports, setReports] = useState([]);
+  const [auditLog, setAuditLog] = useState([]);
   const [activityName, setActivityName] = useState('');
   const [editingActivity, setEditingActivity] = useState(false);
   const { user } = useContext(AuthContext);
@@ -45,6 +46,9 @@ export default function AdminDashboard() {
       } else if (tab === 'reports') {
         const data = await api.adminGetReports(user.token);
         setReports(data);
+      } else if (tab === 'audit') {
+        const data = await api.adminGetAuditLog(user.token);
+        setAuditLog(data);
       }
     } finally {
       setLoading(false);
@@ -123,7 +127,8 @@ export default function AdminDashboard() {
             { key: 'stats', label: '统计', Icon: BarChart3 },
             { key: 'users', label: '用户', Icon: Users },
             { key: 'checkins', label: '打卡', Icon: ClipboardList },
-            { key: 'reports', label: '举报', Icon: Flag }
+            { key: 'reports', label: '举报', Icon: Flag },
+            { key: 'audit', label: '日志', Icon: ScrollText }
           ].map(t => (
             <button
               key={t.key}
@@ -279,6 +284,57 @@ export default function AdminDashboard() {
                 </div>
               </div>
             ))}
+          </div>
+        ) : tab === 'audit' ? (
+          <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+            <div className="p-3 border-b bg-gray-50">
+              <h3 className="font-bold text-sm inline-flex items-center gap-1.5"><ScrollText size={14} /> 操作日志（{auditLog.length}）</h3>
+            </div>
+            {auditLog.length === 0 ? (
+              <p className="text-center text-gray-400 text-sm py-8">还没有操作记录</p>
+            ) : auditLog.map(l => {
+              const label = {
+                delete_user: '删除用户',
+                delete_checkin: '删除打卡',
+                hide_checkin: '隐藏打卡',
+                unhide_checkin: '取消隐藏',
+                freeze_user: '冻结用户',
+                unfreeze_user: '解冻用户',
+                resolve_report: '处理举报',
+                update_settings: '更新设置'
+              }[l.action] || l.action;
+              const color = {
+                delete_user: 'text-red-600 bg-red-50',
+                delete_checkin: 'text-red-600 bg-red-50',
+                hide_checkin: 'text-yellow-700 bg-yellow-50',
+                unhide_checkin: 'text-green-700 bg-green-50',
+                freeze_user: 'text-blue-700 bg-blue-50',
+                unfreeze_user: 'text-green-700 bg-green-50',
+                resolve_report: 'text-purple-700 bg-purple-50',
+                update_settings: 'text-gray-700 bg-gray-100'
+              }[l.action] || 'text-gray-700 bg-gray-100';
+              return (
+                <div key={l.id} className="p-3 border-b last:border-b-0 text-sm">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className={`text-xs font-semibold px-2 py-0.5 rounded ${color}`}>{label}</span>
+                    <span className="text-gray-800 font-medium">{l.actor_name}</span>
+                    <span className="text-xs text-gray-400">
+                      {new Date(l.created_at).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  </div>
+                  {l.target_id && l.target_id !== '-' && (
+                    <p className="text-xs text-gray-500 mt-1 font-mono break-all">
+                      target: {l.target_type}#{l.target_id}
+                    </p>
+                  )}
+                  {l.metadata && Object.keys(l.metadata).length > 0 && (
+                    <p className="text-xs text-gray-500 mt-0.5 font-mono break-all">
+                      {JSON.stringify(l.metadata)}
+                    </p>
+                  )}
+                </div>
+              );
+            })}
           </div>
         ) : tab === 'reports' ? (
           <div className="bg-white rounded-lg shadow-sm overflow-hidden">

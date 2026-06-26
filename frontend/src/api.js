@@ -347,6 +347,7 @@ export const api = {
   adminToggleFreeze: async (_token, userId, frozen) => {
     const { error } = await supabase.from('profiles').update({ frozen }).eq('id', userId);
     if (error) return { error: error.message };
+    logAudit(frozen ? 'freeze_user' : 'unfreeze_user', 'user', userId);
     return { ok: true };
   },
 
@@ -360,12 +361,14 @@ export const api = {
     await supabase.from('checkins').delete().eq('user_id', userId);
     await supabase.from('comments').delete().eq('user_id', userId);
     await supabase.from('likes').delete().eq('user_id', userId);
+    logAudit('delete_user', 'user', userId);
     return { ok: true, note: '用户内容已清除。彻底删除账户需要 Edge Function（使用 service role key）' };
   },
 
   adminDeleteCheckin: async (_token, checkinId) => {
     const { error } = await supabase.from('checkins').delete().eq('id', checkinId);
     if (error) return { error: error.message };
+    logAudit('delete_checkin', 'checkin', checkinId);
     return { ok: true };
   },
 
@@ -403,6 +406,7 @@ export const api = {
       .update({ status: 'resolved', resolved_at: new Date().toISOString() })
       .eq('id', reportId);
     if (error) return { error: error.message };
+    logAudit('resolve_report', 'report', reportId);
     return { ok: true };
   },
 
@@ -412,6 +416,7 @@ export const api = {
       .update({ hidden_at: hide ? new Date().toISOString() : null })
       .eq('id', checkinId);
     if (error) return { error: error.message };
+    logAudit(hide ? 'hide_checkin' : 'unhide_checkin', 'checkin', checkinId);
     return { ok: true };
   },
 
@@ -421,6 +426,41 @@ export const api = {
       .map(([key, value]) => ({ key, value: String(value), updated_at: new Date().toISOString() }));
     const { error } = await supabase.from('settings').upsert(rows);
     if (error) return { error: error.message };
+    logAudit('update_settings', 'settings', '-', updates);
     return { ok: true };
+  },
+
+  adminGetAuditLog: async () => {
+    const { data, error } = await supabase
+      .from('audit_log')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(200);
+    if (error) { console.error(error); return []; }
+    const ids = [...new Set((data || []).map(r => r.actor_id).filter(Boolean))];
+    let nameMap = {};
+    if (ids.length) {
+      const { data: ps } = await supabase.from('profiles').select('id, name').in('id', ids);
+      nameMap = Object.fromEntries((ps || []).map(p => [p.id, p.name]));
+    }
+    return (data || []).map(r => ({ ...r, actor_name: nameMap[r.actor_id] || '未知' }));
   }
 };
+
+// Fire-and-forget audit log writer. Failures don't block the action that
+// triggered them — admin work has already succeeded by the time we log it.
+async function logAudit(action, targetType, targetId, metadata = {}) {
+  try {
+    const uid = await currentUserId();
+    if (!uid) return;
+    await supabase.from('audit_log').insert({
+      actor_id: uid,
+      action,
+      target_type: targetType,
+      target_id: String(targetId),
+      metadata
+    });
+  } catch (e) {
+    console.warn('audit log failed', e);
+  }
+}
