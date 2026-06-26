@@ -2,9 +2,10 @@ import { useState, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CalendarDays } from 'lucide-react';
 import { AuthContext } from '../AuthContext';
+import { api } from '../api';
 
 export default function Login() {
-  const [mode, setMode] = useState('login');
+  const [mode, setMode] = useState('login');  // login | register | forgot
   const [form, setForm] = useState({ name: '', email: '', password: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -18,10 +19,16 @@ export default function Login() {
     try {
       if (mode === 'login') {
         await login(form.email, form.password);
-      } else {
+        navigate('/home');
+      } else if (mode === 'register') {
         await register(form.name, form.email, form.password);
+        navigate('/home');
+      } else if (mode === 'forgot') {
+        const res = await api.sendPasswordReset(form.email);
+        if (res.error) throw new Error(res.error);
+        alert('✅ 重置邮件已发送到 ' + form.email + '\n\n请查收邮箱，点击邮件里的链接设置新密码（也检查一下垃圾箱）');
+        setMode('login');
       }
-      navigate('/home');
     } catch (e) {
       setError(e.message || '出错了');
     } finally {
@@ -65,28 +72,39 @@ export default function Login() {
             onChange={(e) => setForm({ ...form, email: e.target.value })}
             required
           />
-          <input
-            type="password"
-            placeholder="密码"
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            value={form.password}
-            onChange={(e) => setForm({ ...form, password: e.target.value })}
-            required
-          />
+          {mode !== 'forgot' && (
+            <input
+              type="password"
+              placeholder="密码"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              value={form.password}
+              onChange={(e) => setForm({ ...form, password: e.target.value })}
+              required
+            />
+          )}
           <button
             type="submit"
             disabled={loading}
             className="w-full bg-indigo-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-indigo-700 disabled:opacity-50"
           >
-            {loading ? '处理中...' : (mode === 'login' ? '登录' : '注册')}
+            {loading ? '处理中...' : (mode === 'login' ? '登录' : mode === 'register' ? '注册' : '发送重置邮件')}
           </button>
         </form>
+
+        {mode === 'login' && (
+          <button
+            onClick={() => { setMode('forgot'); setError(''); }}
+            className="w-full mt-3 text-gray-500 hover:text-gray-700 text-sm"
+          >
+            忘记密码？
+          </button>
+        )}
 
         <button
           onClick={() => { setMode(mode === 'login' ? 'register' : 'login'); setError(''); }}
           className="w-full mt-4 text-indigo-600 hover:text-indigo-700 font-medium"
         >
-          {mode === 'login' ? '还没有账号？注册一个' : '已有账号？登录'}
+          {mode === 'login' ? '还没有账号？注册一个' : mode === 'register' ? '已有账号？登录' : '返回登录'}
         </button>
       </div>
     </div>

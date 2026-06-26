@@ -92,6 +92,19 @@ export const api = {
     return { id: data.user.id, token: data.session.access_token };
   },
 
+  sendPasswordReset: async (email) => {
+    const redirectTo = `${window.location.origin}/reset`;
+    const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
+    if (error) return { error: error.message };
+    return { ok: true };
+  },
+
+  updatePassword: async (newPassword) => {
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    if (error) return { error: error.message };
+    return { ok: true };
+  },
+
   // ===== profile =====
   getProfile: async () => {
     const uid = await currentUserId();
